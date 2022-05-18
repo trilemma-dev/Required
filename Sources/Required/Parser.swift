@@ -113,8 +113,14 @@ struct Parser {
         //   and (logical AND)
         //   or (logical OR)
         parsedElements = try resolveNegations(parsedElements: parsedElements)
-        parsedElements = try resolveAndOr(parsedElements: parsedElements, symbolType: AndSymbol.self)
-        parsedElements = try resolveAndOr(parsedElements: parsedElements, symbolType: OrSymbol.self)
+        parsedElements = try resolveInfixOperators(parsedElements: parsedElements,
+                                                   symbolType: AndSymbol.self) { lhs, symbol, rhs in
+            AndExpression(lhsExpression: lhs, andSymbol: symbol, rhsExpression: rhs)
+        }
+        parsedElements = try resolveInfixOperators(parsedElements: parsedElements,
+                                                   symbolType: OrSymbol.self) { lhs, symbol, rhs in
+            OrExpression(lhsExpression: lhs, orSymbol: symbol, rhsExpression: rhs)
+        }
         
         // If the tokens represent a semanticly valid input, then there should now be exactly one element in
         // parsedElements and it should be an expression. Otherwise, this is not valid.
@@ -159,8 +165,13 @@ struct Parser {
         return parsedElements
     }
     
-    // TODO: Figure out how to make this less hacky
-    private static func resolveAndOr<T: Any>(parsedElements: [Any], symbolType: T.Type) throws -> [Any] {
+    private static func resolveInfixOperators<T: Symbol>(
+        parsedElements: [Any],
+        symbolType: T.Type, // AndSymbol or OrSymbol
+        createCombinedExpression: (Expression, T, Expression) -> Expression // Create AndExpression or OrExpression
+    ) throws -> [Any] {
+        // Iterate forwards through the elements, creating expressions whenever the current element is of type T. This
+        // requires the previous and next elements to already be expressions; if they're not then the input is invalid.
         var parsedElements = parsedElements
         var currIndex = parsedElements.startIndex
         while currIndex < parsedElements.endIndex {
@@ -173,21 +184,11 @@ struct Parser {
             if let symbol = currElement as? T {
                 guard let beforeExpression = beforeCurrElement as? Expression,
                       let afterExpression = afterCurrElement as? Expression else {
-                          throw ParserError.invalid(description: "\(symbol) must be placed between two expressions")
+                          throw ParserError.invalid(description: "\(symbol.sourceToken.rawValue) must be placed " +
+                                                    "between two expressions")
                 }
                 
-                let combinedExpression: Any
-                if let orSymbol = symbol as? OrSymbol {
-                    combinedExpression = OrExpression(lhsExpression: beforeExpression,
-                                                          orSymbol: orSymbol,
-                                                          rhsExpression: afterExpression)
-                } else if let andSymbol = symbol as? AndSymbol {
-                    combinedExpression = AndExpression(lhsExpression: beforeExpression,
-                                                       andSymbol: andSymbol,
-                                                       rhsExpression: afterExpression)
-                } else {
-                    fatalError("\(T.self) must be of type \(OrSymbol.self) or \(AndSymbol.self)")
-                }
+                let combinedExpression = createCombinedExpression(beforeExpression, symbol, afterExpression)
                 
                 // Remove the three elements we turned into the combined expression, insert that expression where the
                 // first one was located
