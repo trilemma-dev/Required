@@ -260,7 +260,6 @@ final class ParserTests: XCTestCase {
         switch constraint.match {
             case .infix(let comparison, let string):
                 XCTAssert(comparison is LessThanSymbol)
-                XCTAssertEqual(string.rawValue, "\"17.4\"")
                 XCTAssertEqual(string.value, "17.4")
             default:
                 XCTFail("Expected infix operation")
