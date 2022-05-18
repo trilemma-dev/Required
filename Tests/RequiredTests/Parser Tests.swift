@@ -266,6 +266,30 @@ final class ParserTests: XCTestCase {
         }
     }
     
+    // MARK: entitlement
+    
+    func testEntitlement_WildcardEqual() throws {
+        let requirement =
+        """
+        entitlement ["com.apple.security.personal-information.calendars"] = tru*
+        """
+        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        
+        let constraint = try EntitlementConstraint.attemptParse(tokens: tokens)!.0 as! EntitlementConstraint
+        XCTAssertEqual(constraint.key.value, "com.apple.security.personal-information.calendars")
+        switch constraint.match {
+            case .infixEquals(_, let wildcardString):
+                switch wildcardString {
+                    case .postfixWildcard(let string, _):
+                        XCTAssertEqual(string.value, "tru")
+                    default:
+                        XCTFail("Expected postfixWildcard")
+                }
+            default:
+                XCTFail("Expected infixEquals operation")
+        }
+    }
+    
     // MARK: Certificate
     
     func testCertificate_anchorTrusted() throws {
