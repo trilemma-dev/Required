@@ -44,49 +44,56 @@ final class ParserTests: XCTestCase {
     
     func testParse_ElaborateRequirement() throws {
         /* Parse tree:
-         and
-         |--()
-         |  \--or
-         |     |--and
-         |     |  |--anchor trusted
-         |     |  \--cdhash d5800a216ffd83b116b7b0f6047cb7f570f49329
-         |     \--and
-         |        |--and
-         |        |  |--and
-         |        |  |  |--anchor apple generic
-         |        |  |  \--certificate - 1 [ field.1.2.840.113635.100.6.2.6 ]
-         |        |  \--info [ CFBundleVersion ] >= 17.4.2
-         |        \--certificate leaf [ subject.OU ] = 59GAB85EFG
-         \--!
-            \--!
-               \--identifier com.apple.dt.Xcode
+         or
+         |--and
+         |  |--()
+         |  |  \--or
+         |  |     |--and
+         |  |     |  |--anchor trusted
+         |  |     |  \--cdhash d5800a216ffd83b116b7b0f6047cb7f570f49329
+         |  |     \--and
+         |  |        |--and
+         |  |        |  |--and
+         |  |        |  |  |--anchor apple generic
+         |  |        |  |  \--certificate - 1 [ field.1.2.840.113635.100.6.2.6 ]
+         |  |        |  \--info [ CFBundleVersion ] >= 17.4.2
+         |  |        \--certificate leaf [ subject.OU ] = 59GAB85EFG
+         |  \--!
+         |     \--!
+         |        \--identifier com.apple.dt.Xcode
+         \--entitlement [ com.apple.security.app-sandbox ] exists
          */
         let requirement =
         """
-        (anchor trusted and cdhash H"d5800a216ffd83b116b7b0f6047cb7f570f49329" or anchor apple generic and certificate -1[field.1.2.840.113635.100.6.2.6] /* exists */ and info[CFBundleVersion] >= "17.4.2" and certificate leaf[subject.OU] = "59GAB85EFG") and !!identifier "com.apple.dt.Xcode"
+        (anchor trusted and cdhash H"d5800a216ffd83b116b7b0f6047cb7f570f49329" or anchor apple generic and certificate -1[field.1.2.840.113635.100.6.2.6] /* exists */ and info[CFBundleVersion] >= "17.4.2" and certificate leaf[subject.OU] = "59GAB85EFG") and !!identifier "com.apple.dt.Xcode" or entitlement["com.apple.security.app-sandbox"] exists
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
-        let expression = try Parser.parse(tokens: tokens)
+        let statement = try Parser.parse(tokens: tokens)
+        statement.prettyPrint()
         
-        // and between initial parentheses and negated identifier expresion
-        XCTAssert(expression is AndStatement)
-        let andExpression = expression as! AndStatement
+        // or between identifier and entitlement statements
+        XCTAssert(statement is OrStatement)
+        let orStatement = statement as! OrStatement
+        
+        // and between initial parentheses and negated identifier statement
+        XCTAssert(orStatement.lhs is AndStatement)
+        let andStatement = orStatement.lhs as! AndStatement
         
         // parentheses expression
-        XCTAssert(andExpression.lhs is ParenthesesStatement)
-        let parenthesesExpression = andExpression.lhs as! ParenthesesStatement
+        XCTAssert(andStatement.lhs is ParenthesesStatement)
+        let parenthesesStatement = andStatement.lhs as! ParenthesesStatement
         
         // or expression in parentheses expression
-        XCTAssert(parenthesesExpression.statement is OrStatement)
-        let orExpression = parenthesesExpression.statement as! OrStatement
+        XCTAssert(parenthesesStatement.statement is OrStatement)
+        let orInParenthesesStatement = parenthesesStatement.statement as! OrStatement
         
         // and expression before the or
-        XCTAssert(orExpression.lhs is AndStatement)
-        let lhsAndExpresion = orExpression.lhs as! AndStatement
+        XCTAssert(orInParenthesesStatement.lhs is AndStatement)
+        let lhsAndStatement = orInParenthesesStatement.lhs as! AndStatement
         
         // anchor apple generic
-        XCTAssert(lhsAndExpresion.lhs is CertificateConstraint)
-        switch (lhsAndExpresion.lhs as! CertificateConstraint) {
+        XCTAssert(lhsAndStatement.lhs is CertificateConstraint)
+        switch (lhsAndStatement.lhs as! CertificateConstraint) {
             case .trusted(_, _):
                 break
             default:
@@ -94,21 +101,21 @@ final class ParserTests: XCTestCase {
         }
         
         // cdhash H"d5800a216ffd83b116b7b0f6047cb7f570f49329"
-        XCTAssert(lhsAndExpresion.rhs is CodeDirectoryHashConstraint)
-        switch (lhsAndExpresion.rhs as! CodeDirectoryHashConstraint) {
+        XCTAssert(lhsAndStatement.rhs is CodeDirectoryHashConstraint)
+        switch (lhsAndStatement.rhs as! CodeDirectoryHashConstraint) {
             case .hashConstant(_, let hashConstant):
                 XCTAssertEqual(hashConstant.value, "d5800a216ffd83b116b7b0f6047cb7f570f49329")
             default:
                 XCTFail("Expected hashConstant")
         }
         
-        // Last and after the or expression
-        XCTAssert(orExpression.rhs is AndStatement)
-        let rhsAnd1Expression = orExpression.rhs as! AndStatement
+        // Last and after the or in parentheses expression
+        XCTAssert(orInParenthesesStatement.rhs is AndStatement)
+        let rhsAnd1Statement = orInParenthesesStatement.rhs as! AndStatement
         
         // certificate leaf[subject.OU] = "59GAB85EFG"
-        XCTAssert(rhsAnd1Expression.rhs is CertificateConstraint)
-        switch (rhsAnd1Expression.rhs as! CertificateConstraint) {
+        XCTAssert(rhsAnd1Statement.rhs is CertificateConstraint)
+        switch (rhsAnd1Statement.rhs as! CertificateConstraint) {
             case .element(let position, let element, let match):
                 switch position {
                     case .leaf(_, _):
@@ -130,12 +137,12 @@ final class ParserTests: XCTestCase {
         }
         
         // Second to last and after the or expression
-        XCTAssert(rhsAnd1Expression.lhs is AndStatement)
-        let rhsAnd2Expression = (rhsAnd1Expression.lhs as! AndStatement)
+        XCTAssert(rhsAnd1Statement.lhs is AndStatement)
+        let rhsAnd2Statement = (rhsAnd1Statement.lhs as! AndStatement)
         
         // info[CFBundleVersion] >= 17.4.2
-        XCTAssert(rhsAnd2Expression.rhs is InfoConstraint)
-        let infoConstraint = (rhsAnd2Expression.rhs as! InfoConstraint)
+        XCTAssert(rhsAnd2Statement.rhs is InfoConstraint)
+        let infoConstraint = (rhsAnd2Statement.rhs as! InfoConstraint)
         XCTAssertEqual(infoConstraint.key.value, "CFBundleVersion")
         switch infoConstraint.match {
             case .infix(let operation, let string):
@@ -146,12 +153,12 @@ final class ParserTests: XCTestCase {
         }
         
         // First and after the or expression
-        XCTAssert(rhsAnd2Expression.lhs is AndStatement)
-        let rhsAnd3Expression = (rhsAnd2Expression.lhs as! AndStatement)
+        XCTAssert(rhsAnd2Statement.lhs is AndStatement)
+        let rhsAnd3Statement = (rhsAnd2Statement.lhs as! AndStatement)
         
         // anchor apple generic
-        XCTAssert(rhsAnd3Expression.lhs is CertificateConstraint)
-        switch (rhsAnd3Expression.lhs as! CertificateConstraint) {
+        XCTAssert(rhsAnd3Statement.lhs is CertificateConstraint)
+        switch (rhsAnd3Statement.lhs as! CertificateConstraint) {
             case .wholeAppleGeneric(_, _, _):
                 break
             default:
@@ -159,8 +166,8 @@ final class ParserTests: XCTestCase {
         }
         
         // certificate -1[field.1.2.840.113635.100.6.2.6]
-        XCTAssert(rhsAnd3Expression.rhs is CertificateConstraint)
-        switch (rhsAnd3Expression.rhs as! CertificateConstraint) {
+        XCTAssert(rhsAnd3Statement.rhs is CertificateConstraint)
+        switch (rhsAnd3Statement.rhs as! CertificateConstraint) {
             case .elementImplicitExists(let position, let element):
                 switch position {
                     case .negativeFromAnchor(_, _, let integer):
@@ -174,8 +181,8 @@ final class ParserTests: XCTestCase {
         }
         
         // initial negation after the first and
-        XCTAssert(andExpression.rhs is NegationStatement)
-        let negation1 = andExpression.rhs as! NegationStatement
+        XCTAssert(andStatement.rhs is NegationStatement)
+        let negation1 = andStatement.rhs as! NegationStatement
         
         // second negation
         XCTAssert(negation1.statement is NegationStatement)
@@ -189,6 +196,17 @@ final class ParserTests: XCTestCase {
                 XCTAssertEqual(string.value, "com.apple.dt.Xcode")
             default:
                 XCTFail("Expected implicitEquality")
+        }
+        
+        // entitlement [ com.apple.security.app-sandbox ] exists
+        XCTAssert(orStatement.rhs is EntitlementConstraint)
+        let entitlementConstraint = orStatement.rhs as! EntitlementConstraint
+        XCTAssertEqual(entitlementConstraint.key.value, "com.apple.security.app-sandbox")
+        switch entitlementConstraint.match {
+            case .unarySuffix(_):
+                break
+            default:
+                XCTFail("Expected unarySuffix")
         }
     }
     
