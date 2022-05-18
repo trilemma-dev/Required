@@ -8,7 +8,7 @@
 // Language definition:
 // https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/RequirementLang/RequirementLang.html
 
-struct Tokenizer {
+public struct Tokenizer {
     private init() { }
     
     private static let tokenizationOrder: [TokenType] = [
@@ -34,7 +34,7 @@ struct Tokenizer {
     /// Creates a tokenized form of the `requirement` string if possible, or throws a `TokenizationError` if not.
     ///
     /// Just because it is possible to create a valid tokenization does not mean the requirement is semantically valid.
-    static func tokenize(requirement: String) throws -> [Token] {
+    public static func tokenize(requirement: String) throws -> [Token] {
         var tokens = [Token]()
         var currentIndex = requirement.startIndex
         while currentIndex <= requirement.index(before: requirement.endIndex) {
@@ -56,7 +56,7 @@ struct Tokenizer {
     }
 }
 
-struct TokenizationError: Error {
+public struct TokenizationError: Error {
     /// The requirement string which could not be tokenized successfully.
     let requirement: String
     
@@ -89,7 +89,7 @@ struct TokenizationError: Error {
 /// A lexical token for the Code Sign Requirement Language.
 ///
 /// This token has no semantic meaning, it exists as intermediate step which is fed into the parser.
-struct Token: Equatable {
+public struct Token: Equatable {
     let type: TokenType
     let rawValue: String
     let range: Range<String.Index>
@@ -97,7 +97,7 @@ struct Token: Equatable {
 
 // Pretty prints the token to aid in debugging.
 extension Token: CustomStringConvertible {
-    var description: String {
+    public var description: String {
         switch type {
             case .whitespace:
                 if rawValue == " " {
@@ -118,7 +118,7 @@ extension Token: CustomStringConvertible {
 }
 
 /// What the token represents in the source string.
-enum TokenType: Hashable {
+public enum TokenType: Hashable {
     case whitespace
     case comment
     case hashConstant

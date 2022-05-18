@@ -25,16 +25,16 @@ final class ParserTests: XCTestCase {
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         let expression = try Parser.parse(tokens: tokens)
         
-        XCTAssert(expression is AndExpression)
-        let andExpression = expression as! AndExpression
+        XCTAssert(expression is AndStatement)
+        let andExpression = expression as! AndStatement
         
-        XCTAssert(andExpression.lhsExpression is IdentifierExpression)
-        let identifierExpression = andExpression.lhsExpression as! IdentifierExpression
-        XCTAssertEqual(identifierExpression.constant.value, "com.apple.Safari")
+        XCTAssert(andExpression.lhs is IdentifierConstraint)
+        let identifierConstraint = andExpression.lhs as! IdentifierConstraint
+        XCTAssertEqual(identifierConstraint.constant.value, "com.apple.Safari")
         
-        XCTAssert(andExpression.rhsExpression is CertificateExpression)
-        let certificateExpression = andExpression.rhsExpression as! CertificateExpression
-        switch certificateExpression {
+        XCTAssert(andExpression.rhs is CertificateConstraint)
+        let certificateConstraint = andExpression.rhs as! CertificateConstraint
+        switch certificateConstraint {
             case .wholeApple(_, _):
                 break
             default:
@@ -69,24 +69,24 @@ final class ParserTests: XCTestCase {
         let expression = try Parser.parse(tokens: tokens)
         
         // and between initial parentheses and negated identifier expresion
-        XCTAssert(expression is AndExpression)
-        let andExpression = expression as! AndExpression
+        XCTAssert(expression is AndStatement)
+        let andExpression = expression as! AndStatement
         
         // parentheses expression
-        XCTAssert(andExpression.lhsExpression is ParenthesesExpression)
-        let parenthesesExpression = andExpression.lhsExpression as! ParenthesesExpression
+        XCTAssert(andExpression.lhs is ParenthesesStatement)
+        let parenthesesExpression = andExpression.lhs as! ParenthesesStatement
         
         // or expression in parentheses expression
-        XCTAssert(parenthesesExpression.expression is OrExpression)
-        let orExpression = parenthesesExpression.expression as! OrExpression
+        XCTAssert(parenthesesExpression.statement is OrStatement)
+        let orExpression = parenthesesExpression.statement as! OrStatement
         
         // and expression before the or
-        XCTAssert(orExpression.lhsExpression is AndExpression)
-        let lhsAndExpresion = orExpression.lhsExpression as! AndExpression
+        XCTAssert(orExpression.lhs is AndStatement)
+        let lhsAndExpresion = orExpression.lhs as! AndStatement
         
         // anchor apple generic
-        XCTAssert(lhsAndExpresion.lhsExpression is CertificateExpression)
-        switch (lhsAndExpresion.lhsExpression as! CertificateExpression) {
+        XCTAssert(lhsAndExpresion.lhs is CertificateConstraint)
+        switch (lhsAndExpresion.lhs as! CertificateConstraint) {
             case .trusted(_, _):
                 break
             default:
@@ -94,8 +94,8 @@ final class ParserTests: XCTestCase {
         }
         
         // cdhash H"d5800a216ffd83b116b7b0f6047cb7f570f49329"
-        XCTAssert(lhsAndExpresion.rhsExpression is CodeDirectoryHashExpression)
-        switch (lhsAndExpresion.rhsExpression as! CodeDirectoryHashExpression) {
+        XCTAssert(lhsAndExpresion.rhs is CodeDirectoryHashConstraint)
+        switch (lhsAndExpresion.rhs as! CodeDirectoryHashConstraint) {
             case .hashConstant(_, let hashConstant):
                 XCTAssertEqual(hashConstant.value, "d5800a216ffd83b116b7b0f6047cb7f570f49329")
             default:
@@ -103,20 +103,20 @@ final class ParserTests: XCTestCase {
         }
         
         // Last and after the or expression
-        XCTAssert(orExpression.rhsExpression is AndExpression)
-        let rhsAnd1Expression = orExpression.rhsExpression as! AndExpression
+        XCTAssert(orExpression.rhs is AndStatement)
+        let rhsAnd1Expression = orExpression.rhs as! AndStatement
         
         // certificate leaf[subject.OU] = "59GAB85EFG"
-        XCTAssert(rhsAnd1Expression.rhsExpression is CertificateExpression)
-        switch (rhsAnd1Expression.rhsExpression as! CertificateExpression) {
-            case .element(let position, _, let key, _, let match):
+        XCTAssert(rhsAnd1Expression.rhs is CertificateConstraint)
+        switch (rhsAnd1Expression.rhs as! CertificateConstraint) {
+            case .element(let position, let element, let match):
                 switch position {
                     case .leaf(_, _):
                         break
                     default:
                         XCTFail("Expected leaf")
                 }
-                XCTAssertEqual(key.value, "subject.OU")
+                XCTAssertEqual(element.value, "subject.OU")
                 
                 switch match {
                     case .infix(let operation, let string):
@@ -130,14 +130,14 @@ final class ParserTests: XCTestCase {
         }
         
         // Second to last and after the or expression
-        XCTAssert(rhsAnd1Expression.lhsExpression is AndExpression)
-        let rhsAnd2Expression = (rhsAnd1Expression.lhsExpression as! AndExpression)
+        XCTAssert(rhsAnd1Expression.lhs is AndStatement)
+        let rhsAnd2Expression = (rhsAnd1Expression.lhs as! AndStatement)
         
         // info[CFBundleVersion] >= 17.4.2
-        XCTAssert(rhsAnd2Expression.rhsExpression is InfoExpression)
-        let infoExpression = (rhsAnd2Expression.rhsExpression as! InfoExpression)
-        XCTAssertEqual(infoExpression.keySymbol.value, "CFBundleVersion")
-        switch infoExpression.matchExpression {
+        XCTAssert(rhsAnd2Expression.rhs is InfoConstraint)
+        let infoConstraint = (rhsAnd2Expression.rhs as! InfoConstraint)
+        XCTAssertEqual(infoConstraint.key.value, "CFBundleVersion")
+        switch infoConstraint.match {
             case .infix(let operation, let string):
                 XCTAssert(operation is GreaterThanOrEqualToSymbol)
                 XCTAssertEqual(string.value, "17.4.2")
@@ -146,12 +146,12 @@ final class ParserTests: XCTestCase {
         }
         
         // First and after the or expression
-        XCTAssert(rhsAnd2Expression.lhsExpression is AndExpression)
-        let rhsAnd3Expression = (rhsAnd2Expression.lhsExpression as! AndExpression)
+        XCTAssert(rhsAnd2Expression.lhs is AndStatement)
+        let rhsAnd3Expression = (rhsAnd2Expression.lhs as! AndStatement)
         
         // anchor apple generic
-        XCTAssert(rhsAnd3Expression.lhsExpression is CertificateExpression)
-        switch (rhsAnd3Expression.lhsExpression as! CertificateExpression) {
+        XCTAssert(rhsAnd3Expression.lhs is CertificateConstraint)
+        switch (rhsAnd3Expression.lhs as! CertificateConstraint) {
             case .wholeAppleGeneric(_, _, _):
                 break
             default:
@@ -159,32 +159,32 @@ final class ParserTests: XCTestCase {
         }
         
         // certificate -1[field.1.2.840.113635.100.6.2.6]
-        XCTAssert(rhsAnd3Expression.rhsExpression is CertificateExpression)
-        switch (rhsAnd3Expression.rhsExpression as! CertificateExpression) {
-            case .elementImplicitExists(let position, _, let string, _):
+        XCTAssert(rhsAnd3Expression.rhs is CertificateConstraint)
+        switch (rhsAnd3Expression.rhs as! CertificateConstraint) {
+            case .elementImplicitExists(let position, let element):
                 switch position {
                     case .negativeFromAnchor(_, _, let integer):
                         XCTAssertEqual(integer.value, 1)
                     default:
                         XCTFail("Expected negativeFromAnchor")
                 }
-                XCTAssertEqual(string.value, "field.1.2.840.113635.100.6.2.6")
+                XCTAssertEqual(element.value, "field.1.2.840.113635.100.6.2.6")
             default:
                 XCTFail("Expected elementImplicitExists")
         }
         
         // initial negation after the first and
-        XCTAssert(andExpression.rhsExpression is NegationExpression)
-        let negation1 = andExpression.rhsExpression as! NegationExpression
+        XCTAssert(andExpression.rhs is NegationStatement)
+        let negation1 = andExpression.rhs as! NegationStatement
         
         // second negation
-        XCTAssert(negation1.expression is NegationExpression)
-        let negation2 = negation1.expression as! NegationExpression
+        XCTAssert(negation1.statement is NegationStatement)
+        let negation2 = negation1.statement as! NegationStatement
         
         // identifier com.apple.dt.Xcode
-        XCTAssert(negation2.expression is IdentifierExpression)
-        let identifierExpression = negation2.expression as! IdentifierExpression
-        switch identifierExpression {
+        XCTAssert(negation2.statement is IdentifierConstraint)
+        let identifierConstraint = negation2.statement as! IdentifierConstraint
+        switch identifierConstraint {
             case .implicitEquality(_, let string):
                 XCTAssertEqual(string.value, "com.apple.dt.Xcode")
             default:
@@ -203,13 +203,12 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try IdentifierExpression.attemptParse(tokens: tokens)!.0 as! IdentifierExpression
-        switch expression {
+        let constraint = try IdentifierConstraint.attemptParse(tokens: tokens)!.0 as! IdentifierConstraint
+        switch constraint {
             case .explicitEquality(_, _, let string):
                 XCTAssertEqual(string.value, "com.apple.Safari")
             default:
                 XCTFail("Expected explicitEquality operation")
-                
         }
     }
     
@@ -220,8 +219,8 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try IdentifierExpression.attemptParse(tokens: tokens)!.0 as! IdentifierExpression
-        switch expression {
+        let constraint = try IdentifierConstraint.attemptParse(tokens: tokens)!.0 as! IdentifierConstraint
+        switch constraint {
             case .implicitEquality(_, let string):
                 XCTAssertEqual(string.value, "com.apple.Safari")
             default:
@@ -239,9 +238,9 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try InfoExpression.attemptParse(tokens: tokens)!.0 as! InfoExpression
-        XCTAssertEqual(expression.keySymbol.value, "MySpecialMarker")
-        switch expression.matchExpression {
+        let constraint = try InfoConstraint.attemptParse(tokens: tokens)!.0 as! InfoConstraint
+        XCTAssertEqual(constraint.key.value, "MySpecialMarker")
+        switch constraint.match {
             case .unarySuffix(_):
                 break
             default:
@@ -256,9 +255,9 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try InfoExpression.attemptParse(tokens: tokens)!.0 as! InfoExpression
-        XCTAssertEqual(expression.keySymbol.value, "CFBundleShortVersionString")
-        switch expression.matchExpression {
+        let constraint = try InfoConstraint.attemptParse(tokens: tokens)!.0 as! InfoConstraint
+        XCTAssertEqual(constraint.key.value, "CFBundleShortVersionString")
+        switch constraint.match {
             case .infix(let comparison, let string):
                 XCTAssert(comparison is LessThanSymbol)
                 XCTAssertEqual(string.rawValue, "\"17.4\"")
@@ -277,8 +276,8 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try CertificateExpression.attemptParse(tokens: tokens)!.0 as! CertificateExpression
-        switch expression {
+        let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
+        switch constraint {
             case .trusted(let position, _):
                 switch position {
                     case .anchor(_):
@@ -298,8 +297,8 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try CertificateExpression.attemptParse(tokens: tokens)!.0 as! CertificateExpression
-        switch expression {
+        let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
+        switch constraint {
             case .trusted(let position, _):
                 switch position {
                     case .negativeFromAnchor(_, _, let integerSymbol):
@@ -319,8 +318,8 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try CertificateExpression.attemptParse(tokens: tokens)!.0 as! CertificateExpression
-        switch expression {
+        let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
+        switch constraint {
             case .wholeApple(_, _):
                 break
             default:
@@ -335,8 +334,8 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try CertificateExpression.attemptParse(tokens: tokens)!.0 as! CertificateExpression
-        switch expression {
+        let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
+        switch constraint {
             case .wholeAppleGeneric(_, _, _):
                 break
             default:
@@ -351,8 +350,8 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try CertificateExpression.attemptParse(tokens: tokens)!.0 as! CertificateExpression
-        switch expression {
+        let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
+        switch constraint {
             case .whole(let positionExpression, _, let hashConstant):
                 switch positionExpression {
                     case .anchor(_):
@@ -373,8 +372,8 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try CertificateExpression.attemptParse(tokens: tokens)!.0 as! CertificateExpression
-        switch expression {
+        let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
+        switch constraint {
             case .whole(let positionExpression, _, let hashConstant):
                 switch positionExpression {
                     case .leaf(_, _):
@@ -395,9 +394,9 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try CertificateExpression.attemptParse(tokens: tokens)!.0 as! CertificateExpression
-        switch expression {
-            case .element(let position, _, let element, _, let match):
+        let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
+        switch constraint {
+            case .element(let position, let element, let match):
                 switch position {
                     case .positiveFromLeaf(_, let integerSymbol):
                         XCTAssertEqual(integerSymbol.value, 2)
@@ -408,8 +407,8 @@ final class ParserTests: XCTestCase {
                 XCTAssertEqual(element.value, "field.42")
                 
                 switch match {
-                    case .infixEquals(_, let stringExpression):
-                        switch stringExpression {
+                    case .infixEquals(_, let wildcardString):
+                        switch wildcardString {
                             case .postfixWildcard(let string, _):
                                 XCTAssertEqual(string.value, "hello.world")
                             default:
@@ -433,8 +432,8 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try CodeDirectoryHashExpression.attemptParse(tokens: tokens)!.0 as! CodeDirectoryHashExpression
-        switch expression {
+        let constraint = try CodeDirectoryHashConstraint.attemptParse(tokens: tokens)!.0 as! CodeDirectoryHashConstraint
+        switch constraint {
             case .filePath(_, let string):
                 XCTAssertEqual(string.value, "/path/to the/certificate.cer")
             default:
@@ -449,8 +448,8 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try CodeDirectoryHashExpression.attemptParse(tokens: tokens)!.0 as! CodeDirectoryHashExpression
-        switch expression {
+        let constraint = try CodeDirectoryHashConstraint.attemptParse(tokens: tokens)!.0 as! CodeDirectoryHashConstraint
+        switch constraint {
             case .hashConstant(_, let hashConstant):
                 XCTAssertEqual(hashConstant.value, "d5800a216ffd83b116b7b0f6047cb7f570f49329")
             default:
@@ -458,17 +457,17 @@ final class ParserTests: XCTestCase {
         }
     }
     
-    // MARK: match expression
+    // MARK: match
     
-    func testMatchExpression_equal_noWildcards() throws {
+    func testMatch_equal_noWildcards() throws {
         let requirement =
         """
         = hello
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try MatchExpression.attemptParse(tokens: tokens)!.0
-        switch expression {
+        let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
+        switch fragment {
             case .infix(let comparison, let string):
                 XCTAssert(comparison is EqualsSymbol)
                 XCTAssertEqual(string.value, "hello")
@@ -477,17 +476,17 @@ final class ParserTests: XCTestCase {
         }
     }
     
-    func testMatchExpression_equal_bothWildcards() throws {
+    func testMatch_equal_bothWildcards() throws {
         let requirement =
         """
         = *hello*
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try MatchExpression.attemptParse(tokens: tokens)!.0
-        switch expression {
-            case .infixEquals(_, let stringExpression):
-                switch stringExpression {
+        let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
+        switch fragment {
+            case .infixEquals(_, let wildcardString):
+                switch wildcardString {
                     case .prefixAndPostfixWildcard(_, let string, _):
                         XCTAssertEqual(string.value, "hello")
                     default:
@@ -498,17 +497,17 @@ final class ParserTests: XCTestCase {
         }
     }
     
-    func testMatchExpression_equal_prefixWildcard() throws {
+    func testMatch_equal_prefixWildcard() throws {
         let requirement =
         """
         = *hello
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try MatchExpression.attemptParse(tokens: tokens)!.0
-        switch expression {
-            case .infixEquals(_, let stringExpression):
-                switch stringExpression {
+        let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
+        switch fragment {
+            case .infixEquals(_, let wildcardString):
+                switch wildcardString {
                     case .prefixWildcard(_, let string):
                         XCTAssertEqual(string.value, "hello")
                     default:
@@ -519,36 +518,36 @@ final class ParserTests: XCTestCase {
         }
     }
     
-    func testMatchExpression_equal_postfixWildcard() throws {
+    func testMatch_equal_postfixWildcard() throws {
         let requirement =
         """
         = hello*
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try MatchExpression.attemptParse(tokens: tokens)!.0
-        switch expression {
-            case .infixEquals(_, let stringExpression):
-                switch stringExpression {
+        let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
+        switch fragment {
+            case .infixEquals(_, let wildcardString):
+                switch wildcardString {
                     case .postfixWildcard(let string, _):
                         XCTAssertEqual(string.value, "hello")
                     default:
-                        XCTFail("Expected prefixWildcard")
+                        XCTFail("Expected postfixWildcard")
                 }
             default:
                 XCTFail("Expected infixEquals operation")
         }
     }
     
-    func testMatchExpression_exists() throws {
+    func testMatch_exists() throws {
         let requirement =
         """
         exists
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try MatchExpression.attemptParse(tokens: tokens)!.0
-        switch expression {
+        let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
+        switch fragment {
             case .unarySuffix(_):
                 break
             default:
@@ -556,91 +555,20 @@ final class ParserTests: XCTestCase {
         }
     }
     
-    func testMatchExpression_greaterThanOrEqualTo() throws {
+    func testMatch_greaterThanOrEqualTo() throws {
         let requirement =
         """
         >= hello
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
-        let expression = try MatchExpression.attemptParse(tokens: tokens)!.0
-        switch expression {
+        let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
+        switch fragment {
             case .infix(let comparison, let string):
                 XCTAssert(comparison is GreaterThanOrEqualToSymbol)
                 XCTAssertEqual(string.value, "hello")
             default:
                 XCTFail("Expected infix operation")
         }
-    }    
-    
-    
-    func testThisIsARequirement3() {
-        //!!entitlement["foo bar"] <= hello.world.yeah
-        // certificate root[field.100] >= hello
-        // anchor[field.100] > goodbye
-        let text = """
-        anchor[field.42]
-        """ as CFString
-        var requirement: SecRequirement?
-        let result = SecRequirementCreateWithString(text, SecCSFlags(), &requirement)
-        
-        print(result, requirement)
-        
-        // Succeeds:
-        //  anchor[field.42] = hello.world*
-        //  anchor = H"d5800a216ffd83b116b7b0f6047cb7f570f49329"
-        //  anchor[field.42]
-        //  anchor[field.42] exists
     }
-
-    
-    /*
-    
-    
-    func testThisIsARequirement() {
-        let text = """
-        !entitlement["foo bar"] <= hello.world.yeah
-        """ as CFString
-        var requirement: SecRequirement?
-        let result = SecRequirementCreateWithString(text, SecCSFlags(), &requirement)
-        
-        print(result, requirement)
-    }
-    
-    func testThisIsARequirement2() {
-        // info[MyValue] = H"0123456789ABCDEFFEDCBA98765432100A2BC5DA"
-        let text = """
-        info[MyValue] = hello.world*
-        """ as CFString
-        var requirement: SecRequirement?
-        let result = SecRequirementCreateWithString(text, SecCSFlags(), &requirement)
-        
-        print(result, requirement)
-    }
-    
-    
-    func testWhatever() throws {
-        let requirement =
-        """
-        identifier "com.apple.Safari" and anchor apple
-        """
-        let tokens = try CSRTokenizer.tokenize(requirement: requirement)
-        
-        CSRParser.parse(tokens: tokens)
-    }
-    
-    func testIdentifier() throws {
-        let requirement =
-        """
-        identifier "com.apple.Safari"
-        """
-        let tokens = try CSRTokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
-        for token in tokens {
-            print(token)
-        }
-        print("-------")
-        let result = try IdentifierExpression.attemptParse(tokens: tokens)
-        print(result)
-    }
-     */
 }

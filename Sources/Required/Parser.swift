@@ -25,7 +25,6 @@
 //   Certificate
 //   Entitlement
 //   Code Directory Hash
-// TODO: implemenent entitlements, they're basically the same as info
 
 // Logical Operators
 //   ! (negation)
@@ -40,15 +39,14 @@
 //
 // All of the above make up a requirement
 
-
-struct Parser {
+public struct Parser {
     private init() { }
     
-    static func parse(tokens: [Token]) throws -> Expression {
+    public static func parse(tokens: [Token]) throws -> Statement {
         try parseInternal(tokens: tokens.strippingWhitespaceAndComments(), depth: 0).0
     }
     
-    private static func parseInternal(tokens: [Token], depth: UInt) throws -> (Expression, [Token]) {
+    private static func parseInternal(tokens: [Token], depth: UInt) throws -> (Statement, [Token]) {
         var parsedElements = [Any]()
         var tokens = tokens
         while !tokens.isEmpty {
@@ -64,10 +62,10 @@ struct Parser {
                     throw ParserError.invalidToken(description: "( must be matched by )")
                 }
                 let rightParenthesis = tokens.removeFirst()
-                let parenthesesExpression = ParenthesesExpression(leftParenthesis: leftParenthesis,
-                                                       expression: recursionResult.0,
-                                                       rightParenthesis: rightParenthesis)
-                parsedElements.append(parenthesesExpression)
+                let parenthesesStatement = ParenthesesStatement(leftParenthesis: leftParenthesis,
+                                                                statement: recursionResult.0,
+                                                                rightParenthesis: rightParenthesis)
+                parsedElements.append(parenthesesStatement)
                 
             } else if nextToken?.type == .rightParenthesis {
                 if depth == 0 {
@@ -83,11 +81,11 @@ struct Parser {
             } else if nextToken?.type == .identifier, nextToken?.rawValue == "or" {
                 parsedElements.append(OrSymbol(sourceToken: tokens.removeFirst()))
             } else {
-                let parsers = [IdentifierExpression.attemptParse(tokens:),
-                               InfoExpression.attemptParse(tokens:),
-                               // TODO: entitlement parser
-                               CertificateExpression.attemptParse(tokens:),
-                               CodeDirectoryHashExpression.attemptParse(tokens:)]
+                let parsers = [IdentifierConstraint.attemptParse(tokens:),
+                               InfoConstraint.attemptParse(tokens:),
+                               EntitlementConstraint.attemptParse(tokens:),
+                               CertificateConstraint.attemptParse(tokens:),
+                               CodeDirectoryHashConstraint.attemptParse(tokens:)]
                 
                 let parsedCount = parsedElements.count
                 for parser in parsers {
@@ -104,12 +102,12 @@ struct Parser {
         }
         
         // parsedElements should now consist of:
-        //   Expression (specifically various types which conformt to this protocol)
+        //   Statement (specifically various types which conformt to this protocol)
         //   NegationSymbol
         //   AndSymbol
         //   OrSymbol
         
-        // Now it's time to combine these together (if possible) into a valid expression, potentially a deeply nested
+        // Now it's time to combine these together (if possible) into a valid statement, potentially a deeply nested
         // one, following the logical operator precedence order. In order of decreasing precedence:
         //   ! (negation)
         //   and (logical AND)
@@ -117,27 +115,27 @@ struct Parser {
         parsedElements = try resolveNegations(parsedElements: parsedElements)
         parsedElements = try resolveInfixOperators(parsedElements: parsedElements,
                                                    symbolType: AndSymbol.self) { lhs, symbol, rhs in
-            AndExpression(lhsExpression: lhs, andSymbol: symbol, rhsExpression: rhs)
+            AndStatement(lhs: lhs, andSymbol: symbol, rhs: rhs)
         }
         parsedElements = try resolveInfixOperators(parsedElements: parsedElements,
                                                    symbolType: OrSymbol.self) { lhs, symbol, rhs in
-            OrExpression(lhsExpression: lhs, orSymbol: symbol, rhsExpression: rhs)
+            OrStatement(lhs: lhs, orSymbol: symbol, rhs: rhs)
         }
         
         // If the tokens represent a semanticly valid input, then there should now be exactly one element in
-        // parsedElements and it should be an expression. Otherwise, this is not valid.
-        guard parsedElements.count == 1, let expression = parsedElements.first as? Expression else {
-            throw ParserError.invalid(description: "Tokens could not be resolved to a singular expression")
+        // parsedElements and it should be a statement. Otherwise, this is not valid.
+        guard parsedElements.count == 1, let statement = parsedElements.first as? Statement else {
+            throw ParserError.invalid(description: "Tokens could not be resolved to a singular statement")
         }
         
-        return (expression, tokens)
+        return (statement, tokens)
     }
     
     private static func resolveNegations(parsedElements: [Any]) throws -> [Any] {
         // Iterates backwards through the parsed elements resolving negations more easily for cases like:
         //    !!info[FooBar] <= hello.world.yeah
         //
-        // The first NegationSymbol is a modifier of the NegationExpression containing the second one, so by iterating
+        // The first NegationSymbol is a modifier of the NegationStatement containing the second one, so by iterating
         // backwards we can resolve these in place in a single pass.
         var parsedElements = parsedElements
         var currIndex = parsedElements.index(before: parsedElements.endIndex)
@@ -147,17 +145,17 @@ struct Parser {
             let afterCurrElement = afterCurrIndex < parsedElements.endIndex ? parsedElements[afterCurrIndex] : nil
             
             if let negationSymbol = currElement as? NegationSymbol {
-                guard let expresion = afterCurrElement as? Expression else {
+                guard let expresion = afterCurrElement as? Statement else {
                     throw ParserError.invalidNegation(description: "! must be followed by an expression")
                 }
                 
-                let negationExpression = NegationExpression(negationSymbol: negationSymbol, expression: expresion)
+                let negationStatement = NegationStatement(negationSymbol: negationSymbol, statement: expresion)
                 
                 // Remove the two elements we just turned into the NegationExpression, insert that expression where the
                 // first one was located
                 parsedElements.remove(at: afterCurrIndex)
                 parsedElements.remove(at: currIndex)
-                parsedElements.insert(negationExpression, at: currIndex)
+                parsedElements.insert(negationStatement, at: currIndex)
             }
             
             // Continue iterating backwards
@@ -170,10 +168,10 @@ struct Parser {
     private static func resolveInfixOperators<T: Symbol>(
         parsedElements: [Any],
         symbolType: T.Type, // AndSymbol or OrSymbol
-        createCombinedExpression: (Expression, T, Expression) -> Expression // Create AndExpression or OrExpression
+        createCombinedStatment: (Statement, T, Statement) -> Statement // Create AndStatement or OrStatement
     ) throws -> [Any] {
-        // Iterate forwards through the elements, creating expressions whenever the current element is of type T. This
-        // requires the previous and next elements to already be expressions; if they're not then the input is invalid.
+        // Iterate forwards through the elements, creating statements whenever the current element is of type T. This
+        // requires the previous and next elements to already be statements; if they're not then the input is invalid.
         var parsedElements = parsedElements
         var currIndex = parsedElements.startIndex
         while currIndex < parsedElements.endIndex {
@@ -184,20 +182,20 @@ struct Parser {
             let afterCurrElement = afterCurrIndex < parsedElements.endIndex ? parsedElements[afterCurrIndex] : nil
             
             if let symbol = currElement as? T {
-                guard let beforeExpression = beforeCurrElement as? Expression,
-                      let afterExpression = afterCurrElement as? Expression else {
+                guard let beforeStatement = beforeCurrElement as? Statement,
+                      let afterStatement = afterCurrElement as? Statement else {
                           throw ParserError.invalid(description: "\(symbol.sourceToken.rawValue) must be placed " +
-                                                    "between two expressions")
+                                                    "between two statements")
                 }
                 
-                let combinedExpression = createCombinedExpression(beforeExpression, symbol, afterExpression)
+                let combinedStatement = createCombinedStatment(beforeStatement, symbol, afterStatement)
                 
-                // Remove the three elements we turned into the combined expression, insert that expression where the
+                // Remove the three elements we turned into the combined statement, insert that statement where the
                 // first one was located
                 parsedElements.remove(at: afterCurrIndex)
                 parsedElements.remove(at: currIndex)
                 parsedElements.remove(at: beforeCurrIndex)
-                parsedElements.insert(combinedExpression, at: beforeCurrIndex)
+                parsedElements.insert(combinedStatement, at: beforeCurrIndex)
                 
                 // currIndex now refers to the next element, so don't advance it
             } else {
@@ -209,25 +207,25 @@ struct Parser {
     }
 }
 
-
-enum ParserError: Error {
+public enum ParserError: Error {
+    case invalid(description: String)
     case invalidToken(description: String)
     
-    case invalid(description: String)
+    case invalidKeyFragment(description: String)
+    case invalidMatchFragment(description: String)
     
     case invalidAnd(description: String)
     case invalidOr(description: String)
     case invalidNegation(description: String)
-    case invalidIdentifierExpression(description: String)
-    case invalidMatchExpresion(description: String)
-    case invalidInfoExpression(description: String)
-    case invalidCodeDirectoryHashExpression(description: String)
-    case invalidCertificateExpression(description: String)
+    case invalidIdentifier(description: String)
+    case invalidInfo(description: String)
+    case invalidCodeDirectoryHash(description: String)
+    case invalidCertificate(description: String)
 }
 
-enum ExpressionDescription {
+enum StatementDescription {
     case constraint([String])
-    case logicalOperator(String, [ExpressionDescription])
+    case logicalOperator(String, [StatementDescription])
     
     func prettyPrint() {
         prettyPrintInternal(depth: 0, ancestorDepths: [UInt](), isLastChildOfParent: false)
@@ -240,7 +238,7 @@ enum ExpressionDescription {
         for i in 0..<depth {
             if i == depth - 1 { // portion right before this element will be displayed
                 lineStart += isLastChildOfParent ? "\\--" : "|--"
-            } else if ancestorDepths.contains(i) { // whether a | needs to be drawn to an ancestor
+            } else if ancestorDepths.contains(i) { // whether a | needs to be drawn for an ancestor
                 lineStart += "|  "
             } else { // general padding
                 lineStart += "   "
@@ -269,68 +267,80 @@ enum ExpressionDescription {
     }
 }
 
-protocol Expression {
-    var description: ExpressionDescription { get }
+public protocol Statement {
+    func prettyPrint()
 }
 
-protocol Symbol: CustomStringConvertible {
+public extension Statement {
+    func prettyPrint() {
+        (self as! StatementDescribable).description.prettyPrint()
+    }
+}
+
+protocol StatementDescribable {
+    var description: StatementDescription { get }
+}
+
+public protocol Symbol: CustomStringConvertible {
     var sourceToken: Token { get }
 }
 
 extension Symbol {
-    var description: String {
+    public var description: String {
         self.sourceToken.rawValue
     }
 }
 
-struct NegationExpression: Expression {
+public struct NegationStatement: Statement, StatementDescribable {
     let negationSymbol: NegationSymbol
-    let expression: Expression
+    let statement: Statement
     
-    var description: ExpressionDescription {
-        .logicalOperator("!", [expression.description])
+    var description: StatementDescription {
+        .logicalOperator("!", [(statement as! StatementDescribable).description])
     }
 }
 
-struct NegationSymbol: Symbol {
-    let sourceToken: Token
+public struct NegationSymbol: Symbol {
+    public let sourceToken: Token
 }
 
-struct ParenthesesExpression: Expression {
+public struct ParenthesesStatement: Statement, StatementDescribable {
     let leftParenthesis: Token
-    let expression: Expression
+    let statement: Statement
     let rightParenthesis: Token
     
-    var description: ExpressionDescription {
-        .logicalOperator("()", [expression.description])
+    var description: StatementDescription {
+        .logicalOperator("()", [(statement as! StatementDescribable).description])
     }
 }
 
-struct AndSymbol: Symbol {
-    let sourceToken: Token
+public struct AndSymbol: Symbol {
+    public let sourceToken: Token
 }
 
-struct AndExpression: Expression {
-    let lhsExpression: Expression
+public struct AndStatement: Statement, StatementDescribable {
+    let lhs: Statement
     let andSymbol: AndSymbol
-    let rhsExpression: Expression
+    let rhs: Statement
     
-    var description: ExpressionDescription {
-        .logicalOperator("and", [lhsExpression.description, rhsExpression.description])
+    var description: StatementDescription {
+        .logicalOperator("and", [(lhs as! StatementDescribable).description,
+                                 (rhs as! StatementDescribable).description])
     }
 }
 
-struct OrSymbol: Symbol {
-    let sourceToken: Token
+public struct OrSymbol: Symbol {
+    public let sourceToken: Token
 }
 
-struct OrExpression: Expression {
-    let lhsExpression: Expression
+public struct OrStatement: Statement, StatementDescribable {
+    let lhs: Statement
     let orSymbol: OrSymbol
-    let rhsExpression: Expression
+    let rhs: Statement
     
-    var description: ExpressionDescription {
-        .logicalOperator("or", [lhsExpression.description, rhsExpression.description])
+    var description: StatementDescription {
+        .logicalOperator("or", [(lhs as! StatementDescribable).description,
+                                (rhs as! StatementDescribable).description])
     }
 }
 
@@ -375,12 +385,12 @@ struct OrExpression: Expression {
 //  - The lack of wildcard character mentions for info dictionaries is an oversight, not behavioral difference
 //  - Only string constants (plus wildcards) can be matched against
 //    - Based on testing, hash constants are only for `cdhash` and integer constants for cert position
-enum MatchExpression {
-    case infix(InfixComparisonOperator, StringSymbol)
-    case infixEquals(EqualsSymbol, StringExpression)
+public enum MatchFragment {
+    case infix(InfixComparisonOperatorSymbol, StringSymbol)
+    case infixEquals(EqualsSymbol, WildcardString)
     case unarySuffix(ExistsSymbol)
     
-    static func attemptParse(tokens: [Token]) throws -> (MatchExpression, [Token])? {
+    static func attemptParse(tokens: [Token]) throws -> (MatchFragment, [Token])? {
         guard let firstToken = tokens.first else {
             return nil
         }
@@ -393,8 +403,8 @@ enum MatchExpression {
             return (.unarySuffix(existsOperator), remainingTokens)
         }
         
-        // infix or not a match expression
-        let infixOperator: InfixComparisonOperator
+        // infix or not a match fragment
+        let infixOperator: InfixComparisonOperatorSymbol
         switch firstToken.type {
             case .equals:
                 infixOperator = EqualsSymbol(sourceToken: remainingTokens.removeFirst())
@@ -406,55 +416,55 @@ enum MatchExpression {
                 infixOperator = LessThanOrEqualToSymbol(sourceToken: remainingTokens.removeFirst())
             case .greaterThanOrEqualTo:
                 infixOperator = GreaterThanOrEqualToSymbol(sourceToken: remainingTokens.removeFirst())
-            // Not a comparison operator, so can't be parsed as a match expression
+            // Not a comparison operator, so can't be parsed as a match fragment
             default:
                 return nil
         }
         
         guard let secondToken = remainingTokens.first else {
-            throw ParserError.invalidMatchExpresion(description: "No token present after comparison operator")
+            throw ParserError.invalidMatchFragment(description: "No token present after comparison operator")
         }
         
-        let matchExpression: MatchExpression
-        // Equals comparison allows for wildcard string expressions
+        let fragment: MatchFragment
+        // Equals comparison allows for wildcard strings
         if let equalsOperator = infixOperator as? EqualsSymbol {
             if secondToken.type == .identifier {
                 let stringSymbol = StringSymbol(sourceToken: remainingTokens.removeFirst())
                 if let thirdToken = remainingTokens.first, thirdToken.type == .wildcard { // constant*
                     let wildcardSymbol = WildcardSymbol(sourceToken: remainingTokens.removeFirst())
-                    matchExpression = .infixEquals(equalsOperator, .postfixWildcard(stringSymbol, wildcardSymbol))
+                    fragment = .infixEquals(equalsOperator, .postfixWildcard(stringSymbol, wildcardSymbol))
                 } else { // constant
-                    matchExpression = .infix(equalsOperator, stringSymbol)
+                    fragment = .infix(equalsOperator, stringSymbol)
                 }
             } else if secondToken.type == .wildcard {
                 let wildcardSymbol = WildcardSymbol(sourceToken: remainingTokens.removeFirst())
                 guard let thirdToken = remainingTokens.first, thirdToken.type == .identifier else {
-                    throw ParserError.invalidMatchExpresion(description: "No identifier token present after wildcard " +
+                    throw ParserError.invalidMatchFragment(description: "No identifier token present after wildcard " +
                                                             "token: \(secondToken)")
                 }
                 
                 let stringSymbol = StringSymbol(sourceToken: remainingTokens.removeFirst())
                 if let fourthToken = remainingTokens.first, fourthToken.type == .wildcard { // *constant*
                     let secondWildcardSymbol = WildcardSymbol(sourceToken: remainingTokens.removeFirst())
-                    matchExpression = .infixEquals(equalsOperator, .prefixAndPostfixWildcard(wildcardSymbol,
+                    fragment = .infixEquals(equalsOperator, .prefixAndPostfixWildcard(wildcardSymbol,
                                                                                              stringSymbol,
                                                                                              secondWildcardSymbol))
                 } else { // *constant
-                    matchExpression = .infixEquals(equalsOperator, .prefixWildcard(wildcardSymbol, stringSymbol))
+                    fragment = .infixEquals(equalsOperator, .prefixWildcard(wildcardSymbol, stringSymbol))
                 }
             } else {
-                throw ParserError.invalidMatchExpresion(description: "Token after comparison operator neither a " +
+                throw ParserError.invalidMatchFragment(description: "Token after comparison operator neither a " +
                                                         "wildcard nor an identifier. Token: \(secondToken).")
             }
         } else { // All other comparisons only allow for string symbol comparisons (no wildcards)
             guard secondToken.type == .identifier else {
-                throw ParserError.invalidMatchExpresion(description: "Token after comparison operator is not " +
+                throw ParserError.invalidMatchFragment(description: "Token after comparison operator is not " +
                                                         "an identifier. Token: \(secondToken)")
             }
-            matchExpression = .infix(infixOperator, StringSymbol(sourceToken: remainingTokens.removeFirst()))
+            fragment = .infix(infixOperator, StringSymbol(sourceToken: remainingTokens.removeFirst()))
         }
         
-        return (matchExpression, remainingTokens)
+        return (fragment, remainingTokens)
     }
     
     
@@ -462,41 +472,41 @@ enum MatchExpression {
         switch self {
             case .infix(let infixComparisonOperator, let stringSymbol):
                 return [infixComparisonOperator.sourceToken.rawValue, stringSymbol.value]
-            case .infixEquals(_, let stringExpression):
-                return ["="] + stringExpression.description
+            case .infixEquals(_, let wildcardString):
+                return ["="] + wildcardString.description
             case .unarySuffix(_):
                 return ["exists"]
         }
     }
 }
 
-protocol InfixComparisonOperator: Symbol { }
+public protocol InfixComparisonOperatorSymbol: Symbol { }
 
-struct EqualsSymbol: InfixComparisonOperator {
-    let sourceToken: Token
+public struct EqualsSymbol: InfixComparisonOperatorSymbol {
+    public let sourceToken: Token
 }
 
-struct LessThanSymbol: InfixComparisonOperator {
-    let sourceToken: Token
+public struct LessThanSymbol: InfixComparisonOperatorSymbol {
+    public let sourceToken: Token
 }
 
-struct GreaterThanSymbol: InfixComparisonOperator {
-    let sourceToken: Token
+public struct GreaterThanSymbol: InfixComparisonOperatorSymbol {
+    public let sourceToken: Token
 }
 
-struct LessThanOrEqualToSymbol: InfixComparisonOperator {
-    let sourceToken: Token
+public struct LessThanOrEqualToSymbol: InfixComparisonOperatorSymbol {
+    public let sourceToken: Token
 }
 
-struct GreaterThanOrEqualToSymbol: InfixComparisonOperator {
-    let sourceToken: Token
+public struct GreaterThanOrEqualToSymbol: InfixComparisonOperatorSymbol {
+    public let sourceToken: Token
 }
 
-struct ExistsSymbol: Symbol {
-    let sourceToken: Token
+public struct ExistsSymbol: Symbol {
+    public let sourceToken: Token
 }
 
-enum StringExpression {
+public enum WildcardString {
     case prefixWildcard(WildcardSymbol, StringSymbol)
     case postfixWildcard(StringSymbol, WildcardSymbol)
     case prefixAndPostfixWildcard(WildcardSymbol, StringSymbol, WildcardSymbol)
@@ -513,10 +523,10 @@ enum StringExpression {
     }
 }
 
-struct StringSymbol: Symbol {
-    let sourceToken: Token
-    let rawValue: String
-    let value: String
+public struct StringSymbol: Symbol {
+    public let sourceToken: Token
+    public let rawValue: String
+    public let value: String
     
     init(sourceToken: Token) {
         self.sourceToken = sourceToken
@@ -532,8 +542,8 @@ struct StringSymbol: Symbol {
     }
 }
 
-struct WildcardSymbol: Symbol {
-    let sourceToken: Token
+public struct WildcardSymbol: Symbol {
+    public let sourceToken: Token
 }
 
 // MARK: Info
@@ -555,55 +565,107 @@ struct WildcardSymbol: Symbol {
 //
 // Specify key as a string constant.
 
-struct InfoExpression: Expression {
-    let infoSymbol: InfoSymbol
-    let leftBracket: Token
-    let keySymbol: StringSymbol
-    let rightBracket: Token
-    let matchExpression: MatchExpression
+public struct InfoConstraint: Statement, StatementDescribable {
+    public let infoSymbol: InfoSymbol
+    public let key: KeyFragment
+    public let match: MatchFragment
     
-    static func attemptParse(tokens: [Token]) throws -> (Expression, [Token])? {
-        guard let firstToken = tokens.first, firstToken.type == .identifier, firstToken.rawValue == "info" else {
+    static func attemptParse(tokens: [Token]) throws -> (Statement, [Token])? {
+        guard tokens.first?.type == .identifier, tokens.first?.rawValue == "info" else {
             return nil
         }
         
         var remainingTokens = tokens
         let infoSymbol = InfoSymbol(sourceToken: remainingTokens.removeFirst())
-        
-        guard let secondToken = remainingTokens.first, secondToken.type == .leftBracket else {
-            throw ParserError.invalidInfoExpression(description: "Second token is not [")
+        let keyFragmentResult = try KeyFragment.attemptParse(tokens: remainingTokens)
+        remainingTokens = keyFragmentResult.1
+        guard let matchResult = try MatchFragment.attemptParse(tokens: remainingTokens) else {
+            throw ParserError.invalidInfo(description: "End tokens not a match expression")
         }
-        let leftBracket = remainingTokens.removeFirst()
+        let constraint = InfoConstraint(infoSymbol: infoSymbol, key: keyFragmentResult.0, match: matchResult.0)
         
-        guard let thirdToken = remainingTokens.first, thirdToken.type == .identifier else {
-            throw ParserError.invalidInfoExpression(description: "Third token is not an identifier")
-        }
-        let keySymbol = StringSymbol(sourceToken: remainingTokens.removeFirst())
-        
-        guard let fourthToken = remainingTokens.first, fourthToken.type == .rightBracket else {
-            throw ParserError.invalidInfoExpression(description: "Fourth token is not ]")
-        }
-        let rightBracket = remainingTokens.removeFirst()
-        
-        guard let matchResult = try MatchExpression.attemptParse(tokens: remainingTokens) else {
-            throw ParserError.invalidInfoExpression(description: "Fifth and beyond tokens not a match expression")
-        }
-        let infoExpression = InfoExpression(infoSymbol: infoSymbol,
-                                           leftBracket: leftBracket,
-                                           keySymbol: keySymbol,
-                                           rightBracket: rightBracket,
-                                           matchExpression: matchResult.0)
-        
-        return (infoExpression, matchResult.1)
+        return (constraint, matchResult.1)
     }
     
-    var description: ExpressionDescription {
-        .constraint([ "info", "[", keySymbol.value, "]" ] + matchExpression.description)
+    var description: StatementDescription {
+        .constraint(["info"] +  key.description + match.description)
     }
 }
 
-struct InfoSymbol: Symbol {
-    let sourceToken: Token
+public struct InfoSymbol: Symbol {
+    public let sourceToken: Token
+}
+
+// MARK: entitlement
+
+public struct EntitlementConstraint: Statement, StatementDescribable {
+    public let entitlementSymbol: EntitlementSymbol
+    public let key: KeyFragment
+    public let match: MatchFragment
+    
+    static func attemptParse(tokens: [Token]) throws -> (Statement, [Token])? {
+        guard tokens.first?.type == .identifier, tokens.first?.rawValue == "entitlement" else {
+            return nil
+        }
+        
+        var remainingTokens = tokens
+        let infoSymbol = EntitlementSymbol(sourceToken: remainingTokens.removeFirst())
+        let keyFragmentResult = try KeyFragment.attemptParse(tokens: remainingTokens)
+        remainingTokens = keyFragmentResult.1
+        guard let matchResult = try MatchFragment.attemptParse(tokens: remainingTokens) else {
+            throw ParserError.invalidInfo(description: "End tokens not a match expression")
+        }
+        let constraint = EntitlementConstraint(entitlementSymbol: infoSymbol,
+                                               key: keyFragmentResult.0,
+                                               match: matchResult.0)
+        
+        return (constraint, matchResult.1)
+    }
+    
+    var description: StatementDescription {
+        .constraint(["entitlement"] +  key.description + match.description)
+    }
+}
+
+
+public struct EntitlementSymbol: Symbol {
+    public let sourceToken: Token
+}
+
+public struct KeyFragment {
+    public let leftBracket: Token
+    public let keySymbol: StringSymbol
+    public let rightBracket: Token
+    
+    static func attemptParse(tokens: [Token]) throws -> (KeyFragment, [Token]) {
+        var remainingTokens = tokens
+        
+        guard remainingTokens.first?.type == .leftBracket else {
+            throw ParserError.invalidKeyFragment(description: "First token is not [")
+        }
+        let leftBracket = remainingTokens.removeFirst()
+        
+        guard remainingTokens.first?.type == .identifier else {
+            throw ParserError.invalidKeyFragment(description: "Second token is not an identifier")
+        }
+        let keySymbol = StringSymbol(sourceToken: remainingTokens.removeFirst())
+        
+        guard remainingTokens.first?.type == .rightBracket else {
+            throw ParserError.invalidKeyFragment(description: "Third token is not ]")
+        }
+        let rightBracket = remainingTokens.removeFirst()
+        
+        return (KeyFragment(leftBracket: leftBracket, keySymbol: keySymbol, rightBracket: rightBracket),
+                remainingTokens)
+    }
+    
+    var value: String {
+        keySymbol.value
+    }
+    
+    var description: [String] {
+        return ["[", keySymbol.value, "]"]
+    }
 }
 
 // The expression
@@ -612,45 +674,44 @@ struct InfoSymbol: Symbol {
 // succeeds if the unique identifier string embedded in the code signature is exactly equal to constant. The equal sign
 // is optional in identifier expressions. Signing identifiers can be tested only for exact equality; the wildcard
 // character (*) can not be used with the identifier constraint, nor can identifiers be tested for inequality.
-enum IdentifierExpression: Expression {
+public enum IdentifierConstraint: Statement, StatementDescribable {
     case explicitEquality(IdentifierSymbol, EqualsSymbol, StringSymbol)
     case implicitEquality(IdentifierSymbol, StringSymbol)
     
-    static func attemptParse(tokens: [Token]) throws -> (Expression, [Token])? {
-        // Okay to not be an identifier expression
+    static func attemptParse(tokens: [Token]) throws -> (Statement, [Token])? {
         guard tokens.first?.type == .identifier, tokens.first?.rawValue == "identifier" else {
             return nil
         }
         
-        let identifierExpression: IdentifierExpression
+        let identifierConstraint: IdentifierConstraint
         var remainingTokens = tokens
         let identifierSymbol = IdentifierSymbol(sourceToken: remainingTokens.removeFirst())
         // Next element must exist and can either be an equality symbol or a string symbol
         guard let secondToken = remainingTokens.first else {
-            throw ParserError.invalidIdentifierExpression(description: "No token after identifier")
+            throw ParserError.invalidIdentifier(description: "No token after identifier")
         }
         if secondToken.type == .equals {
             let equalsOperator = EqualsSymbol(sourceToken: remainingTokens.removeFirst())
             // Third token must be a string symbol
             guard let thirdToken = remainingTokens.first else {
-                throw ParserError.invalidIdentifierExpression(description: "No token after identifier =")
+                throw ParserError.invalidIdentifier(description: "No token after identifier =")
             }
             if thirdToken.type == .identifier {
                 let stringSymbol = StringSymbol(sourceToken: remainingTokens.removeFirst())
-                identifierExpression = .explicitEquality(identifierSymbol, equalsOperator, stringSymbol)
+                identifierConstraint = .explicitEquality(identifierSymbol, equalsOperator, stringSymbol)
             } else {
-                throw ParserError.invalidIdentifierExpression(description: "Token after identifier = is not an " +
-                                                                           "identifier. Token: \(thirdToken)")
+                throw ParserError.invalidIdentifier(description: "Token after identifier = is not an identifier. " +
+                                                                 "Token: \(thirdToken)")
             }
         } else if secondToken.type == .identifier {
             let stringSymbol = StringSymbol(sourceToken: remainingTokens.removeFirst())
-            identifierExpression = .implicitEquality(identifierSymbol, stringSymbol)
+            identifierConstraint = .implicitEquality(identifierSymbol, stringSymbol)
         } else {
-            throw ParserError.invalidIdentifierExpression(description: "Token after identifier is not an " +
-                                                                       "identifier. Token: \(secondToken)")
+            throw ParserError.invalidIdentifier(description: "Token after identifier is not an identifier. " +
+                                                             "Token: \(secondToken)")
         }
         
-        return (identifierExpression, remainingTokens)
+        return (identifierConstraint, remainingTokens)
     }
     
     var constant: StringSymbol {
@@ -662,7 +723,7 @@ enum IdentifierExpression: Expression {
         }
     }
     
-    var description: ExpressionDescription {
+    var description: StatementDescription {
         switch self {
             case .explicitEquality(_, _, let stringSymbol):
                 return .constraint(["identifier", "=", stringSymbol.value ])
@@ -673,11 +734,9 @@ enum IdentifierExpression: Expression {
 }
 
 /// Literally the symbol for the `identifier` keyword
-struct IdentifierSymbol: Symbol {
-    let sourceToken: Token
+public struct IdentifierSymbol: Symbol {
+    public let sourceToken: Token
 }
-
-
 
 // MARK: cdhash
 
@@ -687,11 +746,11 @@ struct IdentifierSymbol: Symbol {
 //
 // computes the canonical hash of the program’s CodeDirectory resource and succeeds if the value of this hash exactly
 // equals the specified hash constant.
-enum CodeDirectoryHashExpression: Expression {
+public enum CodeDirectoryHashConstraint: Statement, StatementDescribable {
     case filePath(CodeDirectoryHashSymbol, StringSymbol)
     case hashConstant(CodeDirectoryHashSymbol, HashConstantSymbol)
     
-    static func attemptParse(tokens: [Token]) throws -> (Expression, [Token])? {
+    static func attemptParse(tokens: [Token]) throws -> (Statement, [Token])? {
         guard tokens.first?.type == .identifier, tokens.first?.rawValue == "cdhash" else {
             return nil
         }
@@ -701,7 +760,7 @@ enum CodeDirectoryHashExpression: Expression {
         if remainingTokens.first?.type == .hashConstant { // hash constant
             let hashConstantSymbol = HashConstantSymbol(sourceToken: remainingTokens.removeFirst())
             
-            return (CodeDirectoryHashExpression.hashConstant(cdHashSymbol, hashConstantSymbol), remainingTokens)
+            return (CodeDirectoryHashConstraint.hashConstant(cdHashSymbol, hashConstantSymbol), remainingTokens)
         } else if remainingTokens.first?.type == .identifier { // could be a path
             // It's intentional no actual validation is happening as to whether this identifier is actually a path. The
             // full validation would happen as part of compilation whether this value needs to be a valid path, the path
@@ -709,14 +768,14 @@ enum CodeDirectoryHashExpression: Expression {
             // certificate. However, none of that needs to be true to build a valid syntax tree.
             let stringSymbol = StringSymbol(sourceToken: remainingTokens.removeFirst())
             
-            return (CodeDirectoryHashExpression.filePath(cdHashSymbol, stringSymbol), remainingTokens)
+            return (CodeDirectoryHashConstraint.filePath(cdHashSymbol, stringSymbol), remainingTokens)
         } else {
-            throw ParserError.invalidCodeDirectoryHashExpression(description: "Token after cdhash is not a hash " +
+            throw ParserError.invalidCodeDirectoryHash(description: "Token after cdhash is not a hash " +
                                                                 "constant or an identifier")
         }
     }
     
-    var description: ExpressionDescription {
+    var description: StatementDescription {
         switch self {
             case .filePath(_, let stringSymbol):
                 return .constraint(["cdhash", stringSymbol.value])
@@ -726,13 +785,13 @@ enum CodeDirectoryHashExpression: Expression {
     }
 }
 
-struct CodeDirectoryHashSymbol: Symbol {
-    let sourceToken: Token
+public struct CodeDirectoryHashSymbol: Symbol {
+    public let sourceToken: Token
 }
 
 // MARK: Certificate
 
-enum CertificateExpression: Expression {
+public enum CertificateConstraint: Statement, StatementDescribable {
     // anchor apple
     case wholeApple(AnchorSymbol, AppleSymbol)
     // anchor apple generic
@@ -740,20 +799,20 @@ enum CertificateExpression: Expression {
     // certificate position = hash
     case whole(CertificatePosition, EqualsSymbol, HashConstantSymbol)
     // certificate position[element] match expression
-    case element(CertificatePosition, Token, StringSymbol, Token, MatchExpression)
+    case element(CertificatePosition, KeyFragment, MatchFragment)
     // certificate position[element] <- undocumented, frequently seen for designated requirements
-    case elementImplicitExists(CertificatePosition, Token, StringSymbol, Token)
+    case elementImplicitExists(CertificatePosition, KeyFragment)
     // certificate position trusted
     case trusted(CertificatePosition, TrustedSymbol)
     
-    static func attemptParse(tokens: [Token]) throws -> (Expression, [Token])? {
+    static func attemptParse(tokens: [Token]) throws -> (Statement, [Token])? {
         guard let firstToken = tokens.first,
               firstToken.type == .identifier,
               ["cert", "certificate", "anchor"].contains(firstToken.rawValue) else {
             return nil
         }
         
-        let certificateExpression: CertificateExpression
+        let certificateConstraint: CertificateConstraint
         
         let positionParseResult = try CertificatePosition.attemptParse(tokens: tokens)
         let position = positionParseResult.0
@@ -770,61 +829,52 @@ enum CertificateExpression: Expression {
             let appleSymbol = AppleSymbol(sourceToken: remainingTokens.removeFirst())
             if remainingTokens.first?.type == .identifier, remainingTokens.first?.rawValue == "generic" {
                 let genericSymbol = GenericSymbol(sourceToken: remainingTokens.removeFirst())
-                certificateExpression = .wholeAppleGeneric(anchorSymbol, appleSymbol, genericSymbol)
+                certificateConstraint = .wholeAppleGeneric(anchorSymbol, appleSymbol, genericSymbol)
             } else {
-                certificateExpression = .wholeApple(anchorSymbol, appleSymbol)
+                certificateConstraint = .wholeApple(anchorSymbol, appleSymbol)
             }
             
-            return (certificateExpression, remainingTokens)
+            return (certificateConstraint, remainingTokens)
         }
         
         // All other cases
         guard let nextToken = remainingTokens.first else {
-            throw ParserError.invalidCertificateExpression(description: "No token after certificate position")
+            throw ParserError.invalidCertificate(description: "No token after certificate position")
         }
                 
         if nextToken.type == .identifier, nextToken.rawValue == "trusted" { // certificate position trusted
             let trustedSymbol = TrustedSymbol(sourceToken: remainingTokens.removeFirst())
-            certificateExpression = .trusted(position, trustedSymbol)
+            certificateConstraint = .trusted(position, trustedSymbol)
         } else if nextToken.type == .equals { // certificate position = hash
             let equalsOperator = EqualsSymbol(sourceToken: remainingTokens.removeFirst())
             
             guard remainingTokens.first?.type == .hashConstant else {
-                throw ParserError.invalidCertificateExpression(description: "No hash constant token after =")
+                throw ParserError.invalidCertificate(description: "No hash constant token after =")
             }
             let hashConstantSymbol = HashConstantSymbol(sourceToken: remainingTokens.removeFirst())
-            certificateExpression = .whole(position, equalsOperator, hashConstantSymbol)
+            certificateConstraint = .whole(position, equalsOperator, hashConstantSymbol)
         } else if nextToken.type == .leftBracket { // certificate position[element] match expression
                                                    //                   OR
                                                    // certificate position[element]
-            let leftBracketToken = remainingTokens.removeFirst()
-            
-            guard let elementToken = remainingTokens.first, elementToken.type == .identifier else {
-                throw ParserError.invalidCertificateExpression(description: "No identifier token after [")
-            }
-            let element = StringSymbol(sourceToken: remainingTokens.removeFirst())
-            
-            guard remainingTokens.first?.type == .rightBracket else {
-                throw ParserError.invalidCertificateExpression(description: "No ] token after identifier")
-            }
-            let rightBracketToken = remainingTokens.removeFirst()
+            let elementFragmentResult = try KeyFragment.attemptParse(tokens: remainingTokens)
+            remainingTokens = elementFragmentResult.1
             
             // certificate position[element] match expression
-            if let matchResult = try MatchExpression.attemptParse(tokens: remainingTokens) {
-                certificateExpression = .element(position, leftBracketToken, element, rightBracketToken, matchResult.0)
+            if let matchResult = try MatchFragment.attemptParse(tokens: remainingTokens) {
+                certificateConstraint = .element(position, elementFragmentResult.0, matchResult.0)
                 remainingTokens = matchResult.1
             } else { // certificate position[element]
-                certificateExpression = .elementImplicitExists(position, leftBracketToken, element, rightBracketToken)
+                certificateConstraint = .elementImplicitExists(position, elementFragmentResult.0)
             }
         } else {
-            throw ParserError.invalidCertificateExpression(description: "Token after certificiate position not " +
-                                                           "one of: trusted, =, or [")
+            throw ParserError.invalidCertificate(description: "Token after certificiate position not one of: " +
+                                                 "trusted, =, or [")
         }
         
-        return (certificateExpression, remainingTokens)
+        return (certificateConstraint, remainingTokens)
     }
     
-    var description: ExpressionDescription {
+    var description: StatementDescription {
         switch self {
             case .whole(let certificatePosition, _, let hashConstantSymbol):
                 return .constraint(certificatePosition.description + ["=", hashConstantSymbol.value])
@@ -832,30 +882,29 @@ enum CertificateExpression: Expression {
                 return .constraint(["anchor", "apple"])
             case .wholeAppleGeneric(_, _, _):
                 return .constraint(["anchor", "apple", "generic"])
-            case .element(let certificatePosition, _, let stringSymbol, _, let matchExpression):
-                return .constraint(certificatePosition.description + ["[", stringSymbol.value, "]"] +
-                                   matchExpression.description)
-            case .elementImplicitExists(let certificatePosition, _, let stringSymbol, _):
-                return .constraint(certificatePosition.description + ["[", stringSymbol.value, "]"])
+            case .element(let certificatePosition, let element, let match):
+                return .constraint(certificatePosition.description + element.description + match.description)
+            case .elementImplicitExists(let certificatePosition, let element):
+                return .constraint(certificatePosition.description + element.description)
             case .trusted(let certificatePosition, _):
                 return .constraint(certificatePosition.description + ["trusted"])
         }
     }
 }
 
-struct AppleSymbol: Symbol {
-    let sourceToken: Token
+public struct AppleSymbol: Symbol {
+    public let sourceToken: Token
 }
 
-struct GenericSymbol: Symbol {
-    let sourceToken: Token
+public struct GenericSymbol: Symbol {
+    public let sourceToken: Token
 }
 
-struct TrustedSymbol: Symbol {
-    let sourceToken: Token
+public struct TrustedSymbol: Symbol {
+    public let sourceToken: Token
 }
 
-enum CertificatePosition {
+public enum CertificatePosition {
     case root(CertificateSymbol, RootPositionSymbol) // certificate root
     case leaf(CertificateSymbol, LeafPositionSymbol) // certificate leaf
     case positiveFromLeaf(CertificateSymbol, IntegerSymbol) // certificate 2
@@ -863,14 +912,14 @@ enum CertificatePosition {
     case anchor(AnchorSymbol) // anchor
     
     // Note that it's not possible to express `certificate anchor` with the above despite the documentation implying
-    // such an expression is possible. However, trying to create security requirement of `certificate anchor trusted`
-    // fails to compile.
+    // such is possible. However, trying to create security requirement of `certificate anchor trusted` fails to
+    // compile.
     //
     // From Apple:
     //   The syntax `anchor trusted` is not a synonym for `certificate anchor trusted`. Whereas the former checks all
     //   certificates in the signature, the latter checks only the anchor certificate.
     
-    // This assumes that CertificateExpression.attemptParse(...) already determined this should be a position expression
+    // This assumes that CertificateStatement.attemptParse(...) already determined this should be a position expression
     static func attemptParse(tokens: [Token]) throws -> (CertificatePosition, [Token]) {
         var remainingTokens = tokens
         
@@ -880,7 +929,7 @@ enum CertificatePosition {
         } else {
             let certificateSymbol = CertificateSymbol(sourceToken: remainingTokens.removeFirst())
             guard let secondToken = remainingTokens.first else {
-                throw ParserError.invalidCertificateExpression(description: "Missing token after certificate")
+                throw ParserError.invalidCertificate(description: "Missing token after certificate")
             }
             
             if secondToken.type == .identifier {
@@ -892,7 +941,7 @@ enum CertificatePosition {
                     position = .positiveFromLeaf(certificateSymbol,
                                                  IntegerSymbol(sourceToken: remainingTokens.removeFirst()))
                 } else {
-                    throw ParserError.invalidCertificateExpression(description: "Identifier token after certificate " +
+                    throw ParserError.invalidCertificate(description: "Identifier token after certificate " +
                                                                    "is not root, leaf, or an unsigned integer")
                 }
             } else if secondToken.type == .negativePosition {
@@ -905,12 +954,12 @@ enum CertificatePosition {
                                                    negativePositionSymbol,
                                                    IntegerSymbol(sourceToken: remainingTokens.removeFirst()))
                 } else {
-                    throw ParserError.invalidCertificateExpression(description: "Identifier token after - is not an " +
-                                                                   "unsigned integer")
+                    throw ParserError.invalidCertificate(description: "Identifier token after - is not an unsigned " +
+                                                         "integer")
                 }
             } else {
-                throw ParserError.invalidCertificateExpression(description: "Token after certificate is not an " +
-                                                               "identifier or negative position")
+                throw ParserError.invalidCertificate(description: "Token after certificate is not an identifier or " +
+                                                     "negative position")
             }
         }
         
@@ -934,9 +983,9 @@ enum CertificatePosition {
 }
 
 // Used exclusively for certificate positions, optionally with NegativePositionSymbol
-struct IntegerSymbol: Symbol {
-    let sourceToken: Token
-    let value: UInt
+public struct IntegerSymbol: Symbol {
+    public let sourceToken: Token
+    public let value: UInt
     
     init(sourceToken: Token) {
         self.sourceToken = sourceToken
@@ -944,31 +993,31 @@ struct IntegerSymbol: Symbol {
     }
 }
 
-struct NegativePositionSymbol: Symbol {
-    let sourceToken: Token
+public struct NegativePositionSymbol: Symbol {
+    public let sourceToken: Token
 }
 
-struct RootPositionSymbol: Symbol {
-    let sourceToken: Token
+public struct RootPositionSymbol: Symbol {
+    public let sourceToken: Token
 }
 
-struct LeafPositionSymbol: Symbol {
-    let sourceToken: Token
+public struct LeafPositionSymbol: Symbol {
+    public let sourceToken: Token
 }
 
 // certificate or cert
-struct CertificateSymbol: Symbol {
-    let sourceToken: Token
+public struct CertificateSymbol: Symbol {
+    public let sourceToken: Token
 }
 
 // equivalent to: certificate root
-struct AnchorSymbol: Symbol {
-    let sourceToken: Token
+public struct AnchorSymbol: Symbol {
+    public let sourceToken: Token
 }
 
-struct HashConstantSymbol: Symbol {
-    let sourceToken: Token
-    let value: String
+public struct HashConstantSymbol: Symbol {
+    public let sourceToken: Token
+    public let value: String
     
     init(sourceToken: Token) {
         self.sourceToken = sourceToken
