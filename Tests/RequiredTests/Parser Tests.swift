@@ -24,7 +24,6 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         let expression = try Parser.parse(tokens: tokens)
-        expression.description.prettyPrint()
         
         XCTAssert(expression is AndExpression)
         let andExpression = expression as! AndExpression

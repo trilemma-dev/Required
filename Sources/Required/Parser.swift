@@ -45,10 +45,10 @@ struct Parser {
     private init() { }
     
     static func parse(tokens: [Token]) throws -> Expression {
-        try parseInternal(tokens: tokens.strippingWhitespaceAndComments()).0
+        try parseInternal(tokens: tokens.strippingWhitespaceAndComments(), depth: 0).0
     }
     
-    private static func parseInternal(tokens: [Token]) throws -> (Expression, [Token]) {
+    private static func parseInternal(tokens: [Token], depth: UInt) throws -> (Expression, [Token]) {
         var parsedElements = [Any]()
         var tokens = tokens
         while !tokens.isEmpty {
@@ -57,7 +57,7 @@ struct Parser {
             if nextToken?.type == .leftParenthesis {
                 // Recurse into parsing inside the parantheses
                 let leftParenthesis = tokens.removeFirst()
-                let recursionResult = try parseInternal(tokens: tokens)
+                let recursionResult = try parseInternal(tokens: tokens, depth: depth + 1)
                 tokens = recursionResult.1
                 
                 guard tokens.first?.type == .rightParenthesis else {
@@ -70,9 +70,11 @@ struct Parser {
                 parsedElements.append(parenthesesExpression)
                 
             } else if nextToken?.type == .rightParenthesis {
-                // We should've hit the end of recursing, break out of this loop so we can return what's been parsed
-                // It's possible there actually wasn't a leftParenthesis that initiated recurision, that's okay and
-                // will be encountered elsewhere and surfaced as an error.
+                if depth == 0 {
+                    throw ParserError.invalidToken(description: ") was not matched by a starting (")
+                }
+                
+                // The end of this recursion level has been reached, break out of the loop to return what's been parsed
                 break
             } else if nextToken?.type == .negation {
                 parsedElements.append(NegationSymbol(sourceToken: tokens.removeFirst()))
