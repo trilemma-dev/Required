@@ -5,15 +5,20 @@
 //  Created by Josh Kaplan on 2022-05-14
 //
 
-// TODO: add support for requirement sets
-// Requirement Sets
-//   tag => requirement
+public protocol ParseResult {
+    func prettyPrint()
+}
 
 public struct Parser {
     private init() { }
     
-    public static func parse(tokens: [Token]) throws -> Statement {
-        try parseInternal(tokens: tokens.strippingWhitespaceAndComments(), depth: 0).0
+    public static func parse(tokens: [Token]) throws -> ParseResult {
+        let strippedTokens = tokens.strippingWhitespaceAndComments()
+        if let requirementSet = try RequirementSet.attemptParse(tokens: strippedTokens) {
+            return requirementSet
+        } else {
+            return try parseInternal(tokens: tokens, depth: 0).0
+        }
     }
     
     private static func parseInternal(tokens: [Token], depth: UInt) throws -> (Statement, [Token]) {
@@ -181,6 +186,8 @@ public enum ParserError: Error {
     case invalid(description: String)
     case invalidToken(description: String)
     
+    case invalidRequirementSet(description: String)
+    
     case invalidKeyFragment(description: String)
     case invalidMatchFragment(description: String)
     
@@ -193,7 +200,8 @@ public enum ParserError: Error {
     case invalidCertificate(description: String)
 }
 
-public protocol Statement {
+
+public protocol Statement: ParseResult {
     func prettyPrint()
 }
 

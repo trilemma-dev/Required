@@ -69,7 +69,6 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         let statement = try Parser.parse(tokens: tokens)
-        statement.prettyPrint()
         
         // or between identifier and entitlement statements
         XCTAssert(statement is OrStatement)
@@ -210,7 +209,32 @@ final class ParserTests: XCTestCase {
         }
     }
     
-    
+    func testParse_requirementSet() throws {
+        let requirement =
+        """
+        designated => entitlement["com.apple.security.app-sandbox"] = true
+        """
+        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let parseResult = try Parser.parse(tokens: tokens)
+        
+        XCTAssert(parseResult is RequirementSet)
+        let requirementSet = parseResult as! RequirementSet
+        
+        // designated => entitlement["com.apple.security.app-sandbox"] = true
+        XCTAssertNotNil(requirementSet.requirements[.designated])
+        let designatedRequirement = requirementSet.requirements[.designated]!
+        
+        // entitlement["com.apple.security.app-sandbox"] = true
+        XCTAssert(designatedRequirement.requirement is EntitlementConstraint)
+        let entitlementConstraint = designatedRequirement.requirement as! EntitlementConstraint
+        XCTAssertEqual(entitlementConstraint.key.value, "com.apple.security.app-sandbox")
+        switch entitlementConstraint.match {
+            case .infix(_, let string):
+                XCTAssertEqual(string.value, "true")
+            default:
+                XCTFail("Expected infix")
+        }
+    }
     
     // MARK: Identifier
     
@@ -610,6 +634,85 @@ final class ParserTests: XCTestCase {
                 XCTAssertEqual(string.value, "hello")
             default:
                 XCTFail("Expected infix operation")
+        }
+    }
+    
+    // MARK: RequirementSet
+    
+    func testRequirementSet_oneRequirement() throws {
+        let requirement =
+        """
+        designated => entitlement["com.apple.security.app-sandbox"] = true
+        """
+        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let requirementSet = try RequirementSet.attemptParse(tokens: tokens)!
+        
+        // designated => entitlement["com.apple.security.app-sandbox"] = true
+        XCTAssertNotNil(requirementSet.requirements[.designated])
+        let designatedRequirement = requirementSet.requirements[.designated]!
+        
+        // entitlement["com.apple.security.app-sandbox"] = true
+        XCTAssert(designatedRequirement.requirement is EntitlementConstraint)
+        let entitlementConstraint = designatedRequirement.requirement as! EntitlementConstraint
+        XCTAssertEqual(entitlementConstraint.key.value, "com.apple.security.app-sandbox")
+        switch entitlementConstraint.match {
+            case .infix(_, let string):
+                XCTAssertEqual(string.value, "true")
+            default:
+                XCTFail("Expected infix")
+        }
+    }
+    
+    func testRequirementSet_twoRequirements() throws {
+        let requirement =
+        """
+        host => anchor apple and identifier com.apple.perl designated => entitlement["com.apple.security.app-sandbox"] = true
+        """
+        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let requirementSet = try RequirementSet.attemptParse(tokens: tokens)!
+        
+        // host => anchor apple and identifier com.apple.perl
+        XCTAssertNotNil(requirementSet.requirements[.host])
+        let hostRequirement = requirementSet.requirements[.host]!
+        
+        // anchor apple and identifier com.apple.perl
+        XCTAssert(hostRequirement.requirement is AndStatement)
+        let hostAndStatement = hostRequirement.requirement as! AndStatement
+        
+        // anchor apple
+        XCTAssert(hostAndStatement.lhs is CertificateConstraint)
+        let certificateConstraint = hostAndStatement.lhs as! CertificateConstraint
+        switch certificateConstraint {
+            case .wholeApple(_, _):
+                break
+            default:
+                XCTFail("expected wholeApple")
+        }
+        
+        // identifier com.apple.perl
+        XCTAssert(hostAndStatement.rhs is IdentifierConstraint)
+        let identifierConstraint = hostAndStatement.rhs as! IdentifierConstraint
+        switch identifierConstraint {
+            case .implicitEquality(_, let string):
+                XCTAssertEqual(string.value, "com.apple.perl")
+            default:
+                XCTFail("Expected implicitEquality")
+        }
+        
+        
+        // designated => entitlement["com.apple.security.app-sandbox"] = true
+        XCTAssertNotNil(requirementSet.requirements[.designated])
+        let designatedRequirement = requirementSet.requirements[.designated]!
+        
+        // entitlement["com.apple.security.app-sandbox"] = true
+        XCTAssert(designatedRequirement.requirement is EntitlementConstraint)
+        let entitlementConstraint = designatedRequirement.requirement as! EntitlementConstraint
+        XCTAssertEqual(entitlementConstraint.key.value, "com.apple.security.app-sandbox")
+        switch entitlementConstraint.match {
+            case .infix(_, let string):
+                XCTAssertEqual(string.value, "true")
+            default:
+                XCTFail("Expected infix")
         }
     }
 }

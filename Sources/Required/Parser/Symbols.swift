@@ -166,3 +166,31 @@ public struct HashConstantSymbol: Symbol {
         value
     }
 }
+
+public struct RequirementSetSymbol: Symbol {
+    public let sourceToken: Token
+}
+
+public protocol RequirementTagSymbol: Symbol {
+    var requirementTag: RequirementTag { get }
+}
+
+public struct HostSymbol: RequirementTagSymbol {
+    public let sourceToken: Token
+    public let requirementTag = RequirementTag.host
+}
+
+public struct GuestSymbol: RequirementTagSymbol {
+    public let sourceToken: Token
+    public let requirementTag = RequirementTag.guest
+}
+
+public struct LibrarySymbol: RequirementTagSymbol {
+    public let sourceToken: Token
+    public let requirementTag = RequirementTag.library
+}
+
+public struct DesignatedSymbol: RequirementTagSymbol {
+    public let sourceToken: Token
+    public let requirementTag = RequirementTag.designated
+}

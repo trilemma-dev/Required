@@ -16,6 +16,7 @@
 
 ### Parser
 - ``Parser``
+- ``ParseResult``
 - ``Statement``
 - ``ParserError``
 
@@ -38,6 +39,11 @@
 - ``ElementFragment``
 - ``CertificatePosition``
 - ``WildcardString``
+
+### Parser - Requirement Set
+- ``RequirementSet``
+- ``RequirementSetElement``
+- ``RequirementTag``
 
 ### Parser - Symbols
 - ``Symbol``
@@ -67,3 +73,9 @@
 - ``TrustedSymbol``
 - ``CodeDirectoryHashSymbol``
 - ``HashConstantSymbol``
+- ``RequirementTagSymbol``
+- ``RequirementSetSymbol``
+- ``HostSymbol``
+- ``GuestSymbol``
+- ``LibrarySymbol``
+- ``DesignatedSymbol``
