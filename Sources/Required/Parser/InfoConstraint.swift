@@ -19,12 +19,14 @@
 //   info [MySpecialMarker] exists
 //
 // Specify key as a string constant.
-public struct InfoConstraint: Statement, StatementDescribable {
+public struct InfoConstraint: Constraint {
+    public static let generalDescription = "info"
+    
     public let infoSymbol: InfoSymbol
     public let key: KeyFragment
     public let match: MatchFragment
     
-    static func attemptParse(tokens: [Token]) throws -> (Statement, [Token])? {
+    static func attemptParse(tokens: [Token]) throws -> (Requirement, [Token])? {
         guard tokens.first?.type == .identifier, tokens.first?.rawValue == "info" else {
             return nil
         }
@@ -41,7 +43,7 @@ public struct InfoConstraint: Statement, StatementDescribable {
         return (constraint, matchResult.1)
     }
     
-    var description: StatementDescription {
-        .constraint(["info"] +  key.description + match.description)
+    public var textForm: String {
+        return "info\(key.textForm) \(match.textForm)"
     }
 }

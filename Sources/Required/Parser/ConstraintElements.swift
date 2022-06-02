@@ -139,6 +139,17 @@ public enum MatchFragment {
                 return ["exists"]
         }
     }
+    
+    var textForm: String {
+        switch self {
+            case .infix(let infixComparisonOperator, let string):
+                return "\(infixComparisonOperator.sourceToken.rawValue) \(string.sourceToken.rawValue)"
+            case .infixEquals(_, let wildcardString):
+                return "= \(wildcardString.textForm)"
+            case .unarySuffix(_):
+                return "exists"
+        }
+    }
 }
 
 public enum WildcardString {
@@ -154,6 +165,17 @@ public enum WildcardString {
                 return [stringSymbol.value, "*"]
             case .prefixAndPostfixWildcard(_, let stringSymbol, _):
                 return ["*", stringSymbol.value, "*"]
+        }
+    }
+    
+    var textForm: String {
+        switch self {
+            case .prefixWildcard(_, let string):
+                return "*\(string.sourceToken.rawValue)"
+            case .postfixWildcard(let string, _):
+                return "\(string.sourceToken.rawValue)*"
+            case .prefixAndPostfixWildcard(_, let string, _):
+                return "*\(string.sourceToken.rawValue)*"
         }
     }
 }
@@ -193,5 +215,9 @@ public struct KeyFragment {
     
     var description: [String] {
         return ["[", keySymbol.value, "]"]
+    }
+    
+    var textForm: String {
+        return "[\(keySymbol.sourceToken.rawValue)]"
     }
 }

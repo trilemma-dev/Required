@@ -11,11 +11,13 @@
 // succeeds if the unique identifier string embedded in the code signature is exactly equal to constant. The equal sign
 // is optional in identifier expressions. Signing identifiers can be tested only for exact equality; the wildcard
 // character (*) can not be used with the identifier constraint, nor can identifiers be tested for inequality.
-public enum IdentifierConstraint: Statement, StatementDescribable {
+public enum IdentifierConstraint: Constraint {
+    public static let generalDescription = "identifier"
+    
     case explicitEquality(IdentifierSymbol, EqualsSymbol, StringSymbol)
     case implicitEquality(IdentifierSymbol, StringSymbol)
     
-    static func attemptParse(tokens: [Token]) throws -> (Statement, [Token])? {
+    static func attemptParse(tokens: [Token]) throws -> (Requirement, [Token])? {
         guard tokens.first?.type == .identifier, tokens.first?.rawValue == "identifier" else {
             return nil
         }
@@ -60,12 +62,7 @@ public enum IdentifierConstraint: Statement, StatementDescribable {
         }
     }
     
-    var description: StatementDescription {
-        switch self {
-            case .explicitEquality(_, _, let stringSymbol):
-                return .constraint(["identifier", "=", stringSymbol.value ])
-            case .implicitEquality(_, let stringSymbol):
-                return .constraint(["identifier", stringSymbol.value])
-        }
+    public var textForm: String {
+        return "identifier \(constant.sourceToken.rawValue)"
     }
 }

@@ -115,6 +115,20 @@ final class RequirementsValidation: XCTestCase {
         )
         
         // Apple's claim:
+        //   To check for the existence of any certificate field identified by its X.509 object identifier (OID), use
+        //   the form
+        //
+        //     certificate position [field.OID] exists
+        //
+        // Observed:
+        //   While this claim is true, it's also possible to perform (in)equality comparisons on such fields
+        assertValidRequirement(
+        """
+        certificate leaf [field.1.2.840.113635.100.6.2.6] > hello
+        """
+        )
+        
+        // Apple's claim:
         //   The syntax "anchor trusted" is not a synonym for "certificate anchor trusted". Whereas the former checks
         //   all certificates in the signature, the latter checks only the anchor certificate.
         //
@@ -231,4 +245,26 @@ final class RequirementsValidation: XCTestCase {
         )
     }
     
+    
+    /*
+    func testEvaluationOfRequirements() {
+        let text =
+        """
+        certificate leaf [field.1.2.840.113635.100.6.2.6] = hello
+        """
+    
+        var requirement: SecRequirement?
+        let result = SecRequirementCreateWithString(text as CFString, SecCSFlags(), &requirement)
+        XCTAssertNotNil(requirement)
+        XCTAssertEqual(result, errSecSuccess)
+        
+        var code: SecCode?
+        SecCodeCopySelf(SecCSFlags(), &code)
+        
+        var staticCode: SecStaticCode?
+        SecCodeCopyStaticCode(code!, SecCSFlags(), &staticCode)
+        
+        let validityResult = SecStaticCodeCheckValidity(staticCode!, SecCSFlags(), requirement)
+        print(validityResult)
+    }*/
 }

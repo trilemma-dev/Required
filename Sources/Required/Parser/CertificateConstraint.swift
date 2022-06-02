@@ -5,13 +5,17 @@
 //  Created by Josh Kaplan on 2022-05-18
 //
 
-public enum CertificateConstraint: Statement, StatementDescribable {
+public enum CertificateConstraint: Constraint {
+    public static let generalDescription = "certificate"
+    
     // anchor apple
     case wholeApple(AnchorSymbol, AppleSymbol)
     // anchor apple generic
     case wholeAppleGeneric(AnchorSymbol, AppleSymbol, GenericSymbol)
-    // certificate position = hash
-    case whole(CertificatePosition, EqualsSymbol, HashConstantSymbol)
+    // certificate position = hash <- where hash is a constant
+    case wholeHashConstant(CertificatePosition, EqualsSymbol, HashConstantSymbol)
+    // certificate position = hash <- where hash is a file path to a certificate file that will be hashed
+    case wholeHashFilePath(CertificatePosition, EqualsSymbol, StringSymbol)
     // certificate position[element] match expression
     case element(CertificatePosition, ElementFragment, MatchFragment)
     // certificate position[element] <- undocumented, frequently seen for designated requirements
@@ -19,7 +23,7 @@ public enum CertificateConstraint: Statement, StatementDescribable {
     // certificate position trusted
     case trusted(CertificatePosition, TrustedSymbol)
     
-    static func attemptParse(tokens: [Token]) throws -> (Statement, [Token])? {
+    static func attemptParse(tokens: [Token]) throws -> (Requirement, [Token])? {
         guard let firstToken = tokens.first,
               firstToken.type == .identifier,
               ["cert", "certificate", "anchor"].contains(firstToken.rawValue) else {
@@ -62,11 +66,15 @@ public enum CertificateConstraint: Statement, StatementDescribable {
         } else if nextToken.type == .equals { // certificate position = hash
             let equalsOperator = EqualsSymbol(sourceToken: remainingTokens.removeFirst())
             
-            guard remainingTokens.first?.type == .hashConstant else {
-                throw ParserError.invalidCertificate(description: "No hash constant token after =")
+            if remainingTokens.first?.type == .hashConstant { // Hash is a constant
+                let hashConstantSymbol = HashConstantSymbol(sourceToken: remainingTokens.removeFirst())
+                certificateConstraint = .wholeHashConstant(position, equalsOperator, hashConstantSymbol)
+            } else if remainingTokens.first?.type == .identifier { // Hash is a file path
+                let filePath = StringSymbol(sourceToken: remainingTokens.removeFirst())
+                certificateConstraint = .wholeHashFilePath(position, equalsOperator, filePath)
+            } else {
+                throw ParserError.invalidCertificate(description: "No hash constant or file path after =")
             }
-            let hashConstantSymbol = HashConstantSymbol(sourceToken: remainingTokens.removeFirst())
-            certificateConstraint = .whole(position, equalsOperator, hashConstantSymbol)
         } else if nextToken.type == .leftBracket { // certificate position[element] match expression
                                                    //                   OR
                                                    // certificate position[element]
@@ -88,20 +96,22 @@ public enum CertificateConstraint: Statement, StatementDescribable {
         return (certificateConstraint, remainingTokens)
     }
     
-    var description: StatementDescription {
+    public var textForm: String {
         switch self {
-            case .whole(let certificatePosition, _, let hashConstantSymbol):
-                return .constraint(certificatePosition.description + ["=", hashConstantSymbol.value])
             case .wholeApple(_, _):
-                return .constraint(["anchor", "apple"])
+                return "anchor apple"
             case .wholeAppleGeneric(_, _, _):
-                return .constraint(["anchor", "apple", "generic"])
-            case .element(let certificatePosition, let element, let match):
-                return .constraint(certificatePosition.description + element.description + match.description)
-            case .elementImplicitExists(let certificatePosition, let element):
-                return .constraint(certificatePosition.description + element.description)
-            case .trusted(let certificatePosition, _):
-                return .constraint(certificatePosition.description + ["trusted"])
+                return "anchor apple generic"
+            case .wholeHashConstant(let position, _, let hashConstant):
+                return "\(position.textForm) = \(hashConstant.sourceToken.rawValue)"
+            case .wholeHashFilePath(let position, _, let string):
+                return "\(position.textForm) = \(string.sourceToken.rawValue)"
+            case .element(let position, let element, let match):
+                return "\(position.textForm)\(element.textForm) \(match.textForm)"
+            case .elementImplicitExists(let position, let element):
+                return "\(position.textForm)\(element.textForm)"
+            case .trusted(let position, _):
+                return "\(position.textForm) trusted"
         }
     }
 }
@@ -121,7 +131,7 @@ public enum CertificatePosition {
     //   The syntax `anchor trusted` is not a synonym for `certificate anchor trusted`. Whereas the former checks all
     //   certificates in the signature, the latter checks only the anchor certificate.
     
-    // This assumes that CertificateStatement.attemptParse(...) already determined this should be a position expression
+    // This assumes that CertificateRequirement.attemptParse(...) already determined this should be a position expression
     static func attemptParse(tokens: [Token]) throws -> (CertificatePosition, [Token]) {
         var remainingTokens = tokens
         
@@ -174,12 +184,27 @@ public enum CertificatePosition {
                 return ["certificate", "root"]
             case .leaf(_, _):
                 return ["certificate", "leaf"]
-            case .positiveFromLeaf(_, let integerSymbol):
-                return ["certificate", integerSymbol.sourceToken.rawValue]
-            case .negativeFromAnchor(_, _, let integerSymbol):
-                return ["certificate", "-", integerSymbol.sourceToken.rawValue]
+            case .positiveFromLeaf(_, let integer):
+                return ["certificate", integer.sourceToken.rawValue]
+            case .negativeFromAnchor(_, _, let integer):
+                return ["certificate", "-", integer.sourceToken.rawValue]
             case .anchor(_):
                 return ["anchor"]
+        }
+    }
+    
+    var textForm: String {
+        switch self {
+            case .root(_, _):
+                return "certificate root"
+            case .leaf(_, _):
+                return "certificate leaf"
+            case .positiveFromLeaf(_, let integer):
+                return "certificate \(integer.sourceToken.rawValue)"
+            case .negativeFromAnchor(_, _, let integer):
+                return "certificate -\(integer.sourceToken.rawValue)"
+            case .anchor(_):
+                return "anchor"
         }
     }
 }

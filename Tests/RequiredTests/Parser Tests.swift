@@ -15,25 +15,22 @@ final class ParserTests: XCTestCase {
     func testParse_SafariDesignatedRequirement() throws {
         /* Parse tree:
          and
-         |--identifier com.apple.Safari
+         |--identifier "com.apple.Safari"
          \--anchor apple
          */
-        let requirement =
+        let andRequirement = try parse(
         """
         identifier "com.apple.Safari" and anchor apple
-        """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
-        let expression = try Parser.parse(tokens: tokens)
+        """, asType: AndRequirement.self)
         
-        XCTAssert(expression is AndStatement)
-        let andExpression = expression as! AndStatement
-        
-        XCTAssert(andExpression.lhs is IdentifierConstraint)
-        let identifierConstraint = andExpression.lhs as! IdentifierConstraint
+        // identifier "com.apple.Safari"
+        XCTAssert(andRequirement.lhs is IdentifierConstraint)
+        let identifierConstraint = andRequirement.lhs as! IdentifierConstraint
         XCTAssertEqual(identifierConstraint.constant.value, "com.apple.Safari")
         
-        XCTAssert(andExpression.rhs is CertificateConstraint)
-        let certificateConstraint = andExpression.rhs as! CertificateConstraint
+        // anchor apple
+        XCTAssert(andRequirement.rhs is CertificateConstraint)
+        let certificateConstraint = andRequirement.rhs as! CertificateConstraint
         switch certificateConstraint {
             case .wholeApple(_, _):
                 break
@@ -50,49 +47,43 @@ final class ParserTests: XCTestCase {
          |  |  \--or
          |  |     |--and
          |  |     |  |--anchor trusted
-         |  |     |  \--cdhash d5800a216ffd83b116b7b0f6047cb7f570f49329
+         |  |     |  \--cdhash H"d5800a216ffd83b116b7b0f6047cb7f570f49329"
          |  |     \--and
          |  |        |--and
          |  |        |  |--and
          |  |        |  |  |--anchor apple generic
-         |  |        |  |  \--certificate - 1 [ field.1.2.840.113635.100.6.2.6 ]
-         |  |        |  \--info [ CFBundleVersion ] >= 17.4.2
-         |  |        \--certificate leaf [ subject.OU ] = 59GAB85EFG
+         |  |        |  |  \--certificate -1[field.1.2.840.113635.100.6.2.6]
+         |  |        |  \--info[CFBundleVersion] >= "17.4.2"
+         |  |        \--certificate leaf[subject.OU] = "59GAB85EFG"
          |  \--!
          |     \--!
-         |        \--identifier com.apple.dt.Xcode
-         \--entitlement [ com.apple.security.app-sandbox ] exists
+         |        \--identifier "com.apple.dt.Xcode"
+         \--entitlement["com.apple.security.app-sandbox"] exists
          */
-        let requirement =
+        let orRequirement = try parse(
         """
         (anchor trusted and cdhash H"d5800a216ffd83b116b7b0f6047cb7f570f49329" or anchor apple generic and certificate -1[field.1.2.840.113635.100.6.2.6] /* exists */ and info[CFBundleVersion] >= "17.4.2" and certificate leaf[subject.OU] = "59GAB85EFG") and !!identifier "com.apple.dt.Xcode" or entitlement["com.apple.security.app-sandbox"] exists
-        """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
-        let statement = try Parser.parse(tokens: tokens)
+        """, asType: OrRequirement.self)
         
-        // or between identifier and entitlement statements
-        XCTAssert(statement is OrStatement)
-        let orStatement = statement as! OrStatement
+        // and between initial parentheses and negated identifier requirement
+        XCTAssert(orRequirement.lhs is AndRequirement)
+        let andRequirement = orRequirement.lhs as! AndRequirement
         
-        // and between initial parentheses and negated identifier statement
-        XCTAssert(orStatement.lhs is AndStatement)
-        let andStatement = orStatement.lhs as! AndStatement
+        // parentheses requirement
+        XCTAssert(andRequirement.lhs is ParenthesesRequirement)
+        let parenthesesRequirement = andRequirement.lhs as! ParenthesesRequirement
         
-        // parentheses expression
-        XCTAssert(andStatement.lhs is ParenthesesStatement)
-        let parenthesesStatement = andStatement.lhs as! ParenthesesStatement
+        // or requirement in parentheses requirement
+        XCTAssert(parenthesesRequirement.requirement is OrRequirement)
+        let orInParenthesesRequirement = parenthesesRequirement.requirement as! OrRequirement
         
-        // or expression in parentheses expression
-        XCTAssert(parenthesesStatement.statement is OrStatement)
-        let orInParenthesesStatement = parenthesesStatement.statement as! OrStatement
-        
-        // and expression before the or
-        XCTAssert(orInParenthesesStatement.lhs is AndStatement)
-        let lhsAndStatement = orInParenthesesStatement.lhs as! AndStatement
+        // and requirement before the or
+        XCTAssert(orInParenthesesRequirement.lhs is AndRequirement)
+        let lhsAndRequirement = orInParenthesesRequirement.lhs as! AndRequirement
         
         // anchor apple generic
-        XCTAssert(lhsAndStatement.lhs is CertificateConstraint)
-        switch (lhsAndStatement.lhs as! CertificateConstraint) {
+        XCTAssert(lhsAndRequirement.lhs is CertificateConstraint)
+        switch (lhsAndRequirement.lhs as! CertificateConstraint) {
             case .trusted(_, _):
                 break
             default:
@@ -100,21 +91,17 @@ final class ParserTests: XCTestCase {
         }
         
         // cdhash H"d5800a216ffd83b116b7b0f6047cb7f570f49329"
-        XCTAssert(lhsAndStatement.rhs is CodeDirectoryHashConstraint)
-        switch (lhsAndStatement.rhs as! CodeDirectoryHashConstraint) {
-            case .hashConstant(_, let hashConstant):
-                XCTAssertEqual(hashConstant.value, "d5800a216ffd83b116b7b0f6047cb7f570f49329")
-            default:
-                XCTFail("Expected hashConstant")
-        }
+        XCTAssert(lhsAndRequirement.rhs is CodeDirectoryHashConstraint)
+        let cdHashConstraint = lhsAndRequirement.rhs as! CodeDirectoryHashConstraint
+        XCTAssertEqual(cdHashConstraint.hashConstantSymbol.value, "d5800a216ffd83b116b7b0f6047cb7f570f49329")
         
-        // Last and after the or in parentheses expression
-        XCTAssert(orInParenthesesStatement.rhs is AndStatement)
-        let rhsAnd1Statement = orInParenthesesStatement.rhs as! AndStatement
+        // Last and after the or in parentheses requirement
+        XCTAssert(orInParenthesesRequirement.rhs is AndRequirement)
+        let rhsAnd1Requirement = orInParenthesesRequirement.rhs as! AndRequirement
         
         // certificate leaf[subject.OU] = "59GAB85EFG"
-        XCTAssert(rhsAnd1Statement.rhs is CertificateConstraint)
-        switch (rhsAnd1Statement.rhs as! CertificateConstraint) {
+        XCTAssert(rhsAnd1Requirement.rhs is CertificateConstraint)
+        switch (rhsAnd1Requirement.rhs as! CertificateConstraint) {
             case .element(let position, let element, let match):
                 switch position {
                     case .leaf(_, _):
@@ -135,13 +122,13 @@ final class ParserTests: XCTestCase {
                 XCTFail("Expected element")
         }
         
-        // Second to last and after the or expression
-        XCTAssert(rhsAnd1Statement.lhs is AndStatement)
-        let rhsAnd2Statement = (rhsAnd1Statement.lhs as! AndStatement)
+        // Second to last and after the or requirement
+        XCTAssert(rhsAnd1Requirement.lhs is AndRequirement)
+        let rhsAnd2Requirement = (rhsAnd1Requirement.lhs as! AndRequirement)
         
         // info[CFBundleVersion] >= 17.4.2
-        XCTAssert(rhsAnd2Statement.rhs is InfoConstraint)
-        let infoConstraint = (rhsAnd2Statement.rhs as! InfoConstraint)
+        XCTAssert(rhsAnd2Requirement.rhs is InfoConstraint)
+        let infoConstraint = (rhsAnd2Requirement.rhs as! InfoConstraint)
         XCTAssertEqual(infoConstraint.key.value, "CFBundleVersion")
         switch infoConstraint.match {
             case .infix(let operation, let string):
@@ -151,13 +138,13 @@ final class ParserTests: XCTestCase {
                 XCTFail("Expected infix")
         }
         
-        // First and after the or expression
-        XCTAssert(rhsAnd2Statement.lhs is AndStatement)
-        let rhsAnd3Statement = (rhsAnd2Statement.lhs as! AndStatement)
+        // First and after the or requirement
+        XCTAssert(rhsAnd2Requirement.lhs is AndRequirement)
+        let rhsAnd3Requirement = (rhsAnd2Requirement.lhs as! AndRequirement)
         
         // anchor apple generic
-        XCTAssert(rhsAnd3Statement.lhs is CertificateConstraint)
-        switch (rhsAnd3Statement.lhs as! CertificateConstraint) {
+        XCTAssert(rhsAnd3Requirement.lhs is CertificateConstraint)
+        switch (rhsAnd3Requirement.lhs as! CertificateConstraint) {
             case .wholeAppleGeneric(_, _, _):
                 break
             default:
@@ -165,8 +152,8 @@ final class ParserTests: XCTestCase {
         }
         
         // certificate -1[field.1.2.840.113635.100.6.2.6]
-        XCTAssert(rhsAnd3Statement.rhs is CertificateConstraint)
-        switch (rhsAnd3Statement.rhs as! CertificateConstraint) {
+        XCTAssert(rhsAnd3Requirement.rhs is CertificateConstraint)
+        switch (rhsAnd3Requirement.rhs as! CertificateConstraint) {
             case .elementImplicitExists(let position, let element):
                 switch position {
                     case .negativeFromAnchor(_, _, let integer):
@@ -180,16 +167,16 @@ final class ParserTests: XCTestCase {
         }
         
         // initial negation after the first and
-        XCTAssert(andStatement.rhs is NegationStatement)
-        let negation1 = andStatement.rhs as! NegationStatement
+        XCTAssert(andRequirement.rhs is NegationRequirement)
+        let negation1 = andRequirement.rhs as! NegationRequirement
         
         // second negation
-        XCTAssert(negation1.statement is NegationStatement)
-        let negation2 = negation1.statement as! NegationStatement
+        XCTAssert(negation1.requirement is NegationRequirement)
+        let negation2 = negation1.requirement as! NegationRequirement
         
         // identifier com.apple.dt.Xcode
-        XCTAssert(negation2.statement is IdentifierConstraint)
-        let identifierConstraint = negation2.statement as! IdentifierConstraint
+        XCTAssert(negation2.requirement is IdentifierConstraint)
+        let identifierConstraint = negation2.requirement as! IdentifierConstraint
         switch identifierConstraint {
             case .implicitEquality(_, let string):
                 XCTAssertEqual(string.value, "com.apple.dt.Xcode")
@@ -198,8 +185,8 @@ final class ParserTests: XCTestCase {
         }
         
         // entitlement [ com.apple.security.app-sandbox ] exists
-        XCTAssert(orStatement.rhs is EntitlementConstraint)
-        let entitlementConstraint = orStatement.rhs as! EntitlementConstraint
+        XCTAssert(orRequirement.rhs is EntitlementConstraint)
+        let entitlementConstraint = orRequirement.rhs as! EntitlementConstraint
         XCTAssertEqual(entitlementConstraint.key.value, "com.apple.security.app-sandbox")
         switch entitlementConstraint.match {
             case .unarySuffix(_):
@@ -210,15 +197,10 @@ final class ParserTests: XCTestCase {
     }
     
     func testParse_requirementSet() throws {
-        let requirement =
+        let requirementSet = try parseRequirementSet(
         """
         designated => entitlement["com.apple.security.app-sandbox"] = true
-        """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
-        let parseResult = try Parser.parse(tokens: tokens)
-        
-        XCTAssert(parseResult is RequirementSet)
-        let requirementSet = parseResult as! RequirementSet
+        """)
         
         // designated => entitlement["com.apple.security.app-sandbox"] = true
         XCTAssertNotNil(requirementSet.requirements[.designated])
@@ -417,7 +399,7 @@ final class ParserTests: XCTestCase {
         
         let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
         switch constraint {
-            case .whole(let positionExpression, _, let hashConstant):
+            case .wholeHashConstant(let positionExpression, _, let hashConstant):
                 switch positionExpression {
                     case .anchor(_):
                         break
@@ -439,7 +421,7 @@ final class ParserTests: XCTestCase {
         
         let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
         switch constraint {
-            case .whole(let positionExpression, _, let hashConstant):
+            case .wholeHashConstant(let positionExpression, _, let hashConstant):
                 switch positionExpression {
                     case .leaf(_, _):
                         break
@@ -448,7 +430,29 @@ final class ParserTests: XCTestCase {
                 }
                 XCTAssertEqual(hashConstant.value, "0123456789ABCDEFFEDCBA98765432100A2BC5DA")
             default:
-                XCTFail("Expected whole case")
+                XCTFail("Expected wholeHashConstant case")
+        }
+    }
+    
+    func testCertificate_certificatePositionEqualHash_filePath() throws {
+        let requirement =
+        """
+        certificate leaf = "/path/to/cert"
+        """
+        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        
+        let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
+        switch constraint {
+            case .wholeHashFilePath(let positionExpression, _, let filePath):
+                switch positionExpression {
+                    case .leaf(_, _):
+                        break
+                    default:
+                        XCTFail("Expected leaf case")
+                }
+                XCTAssertEqual(filePath.value, "/path/to/cert")
+            default:
+                XCTFail("Expected wholeHashFilePath case")
         }
     }
     
@@ -490,23 +494,7 @@ final class ParserTests: XCTestCase {
     
     // MARK: Code Directory Hash
     
-    func testCodeDirectoryHash_filePath() throws {
-        let requirement =
-        """
-        cdhash "/path/to the/certificate.cer"
-        """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
-        
-        let constraint = try CodeDirectoryHashConstraint.attemptParse(tokens: tokens)!.0 as! CodeDirectoryHashConstraint
-        switch constraint {
-            case .filePath(_, let string):
-                XCTAssertEqual(string.value, "/path/to the/certificate.cer")
-            default:
-                XCTFail("Expected filePath case")
-        }
-    }
-    
-    func testCodeDirectoryHash_hashConstant() throws {
+    func testCodeDirectoryHash() throws {
         let requirement =
         """
         cdhash H"d5800a216ffd83b116b7b0f6047cb7f570f49329"
@@ -514,12 +502,7 @@ final class ParserTests: XCTestCase {
         let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
         
         let constraint = try CodeDirectoryHashConstraint.attemptParse(tokens: tokens)!.0 as! CodeDirectoryHashConstraint
-        switch constraint {
-            case .hashConstant(_, let hashConstant):
-                XCTAssertEqual(hashConstant.value, "d5800a216ffd83b116b7b0f6047cb7f570f49329")
-            default:
-                XCTFail("Expected hashConstant case")
-        }
+        XCTAssertEqual(constraint.hashConstantSymbol.value, "d5800a216ffd83b116b7b0f6047cb7f570f49329")
     }
     
     // MARK: match
@@ -676,8 +659,8 @@ final class ParserTests: XCTestCase {
         let hostRequirement = requirementSet.requirements[.host]!
         
         // anchor apple and identifier com.apple.perl
-        XCTAssert(hostRequirement.requirement is AndStatement)
-        let hostAndStatement = hostRequirement.requirement as! AndStatement
+        XCTAssert(hostRequirement.requirement is AndRequirement)
+        let hostAndStatement = hostRequirement.requirement as! AndRequirement
         
         // anchor apple
         XCTAssert(hostAndStatement.lhs is CertificateConstraint)

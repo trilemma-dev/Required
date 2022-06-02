@@ -15,10 +15,10 @@ public enum RequirementTag {
 public struct RequirementSetElement {
     public let tagSymbol: RequirementTagSymbol
     public let setSymbol: RequirementSetSymbol
-    public let requirement: Statement
+    public let requirement: Requirement
 }
 
-public struct RequirementSet: ParseResult {
+public struct RequirementSet {
     public let requirements: [RequirementTag : RequirementSetElement]
     
     private static let tagInitializers: [String : (Token) -> RequirementTagSymbol ] =
@@ -69,21 +69,21 @@ public struct RequirementSet: ParseResult {
             }
             
             guard let tagInitializer = tagInitializers[tokens[currentTagSymbolIndex].rawValue] else {
-                throw ParserError.invalidRequirementSet(description: "\(tokens[currentTagSymbolIndex].rawValue) is " +
-                                                        "not a valid requirement tag")
+                let description = "\(tokens[currentTagSymbolIndex].rawValue) is not a valid requirement tag"
+                throw ParserError.invalidRequirementSet(description: description)
             }
             
             let tagSymbol = tagInitializer(tokens[currentTagSymbolIndex])
             let setSymbol = RequirementSetSymbol(sourceToken: tokens[currentSetSymbolIndex])
             let requirementTokens = Array(tokens[currentSetRange])
             let parseResult = try Parser.parse(tokens: requirementTokens)
-            guard let requirementStatement = parseResult as? Statement else {
-                throw ParserError.invalidRequirementSet(description: "Invalid statement for \(tagSymbol)")
+            guard case .requirement(let requirement) = parseResult else {
+                throw ParserError.invalidRequirementSet(description: "Invalid requirement for \(tagSymbol)")
             }
             
             let setElement = RequirementSetElement(tagSymbol: tagSymbol,
                                                    setSymbol: setSymbol,
-                                                   requirement: requirementStatement)
+                                                   requirement: requirement)
             requirements[tagSymbol.requirementTag] = setElement
         }
         

@@ -5,12 +5,14 @@
 //  Created by Josh Kaplan on 2022-05-18
 //
 
-public struct EntitlementConstraint: Statement, StatementDescribable {
+public struct EntitlementConstraint: Constraint {
+    public static let generalDescription = "entitlement"
+    
     public let entitlementSymbol: EntitlementSymbol
     public let key: KeyFragment
     public let match: MatchFragment
     
-    static func attemptParse(tokens: [Token]) throws -> (Statement, [Token])? {
+    static func attemptParse(tokens: [Token]) throws -> (Requirement, [Token])? {
         guard tokens.first?.type == .identifier, tokens.first?.rawValue == "entitlement" else {
             return nil
         }
@@ -29,7 +31,7 @@ public struct EntitlementConstraint: Statement, StatementDescribable {
         return (constraint, matchResult.1)
     }
     
-    var description: StatementDescription {
-        .constraint(["entitlement"] +  key.description + match.description)
+    public var textForm: String {
+        return "entitlement\(key.textForm) \(match.textForm)"
     }
 }

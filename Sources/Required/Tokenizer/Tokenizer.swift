@@ -56,67 +56,6 @@ public struct Tokenizer {
     }
 }
 
-public struct TokenizationError: Error {
-    /// The requirement string which could not be tokenized successfully.
-    let requirement: String
-    
-    /// The index in the `requirement` String at which tokenization failed.
-    let failureIndex: String.Index
-    
-    /// The portion of the `requirement` string which failed to be tokenized.
-    var nonTokenizedPortion: Substring {
-        requirement[failureIndex..<requirement.endIndex]
-    }
-    
-    /// Guidance on why the requirement may be failing to tokenize.
-    var debugGuidance: String {
-        let failurePortion = nonTokenizedPortion
-        
-        if failurePortion.starts(with: "//") {
-            return "// style comments must be terminated with a new line"
-        } else if failurePortion.starts(with: "/*") {
-            return "/* */ style comments must be terminated with */"
-        } else if failurePortion.starts(with: "H\"") {
-            return "Hash constants beginning with H\" must be terminated with \""
-        } else if failurePortion.starts(with: "/") {
-            return "Unquoted absolute file paths starting with a / may only contain letters, numbers, and periods"
-        } else {
-            return "No specific guidance available; check only valid characters have been used"
-        }
-    }
-}
-
-/// A lexical token for the Code Sign Requirement Language.
-///
-/// This token has no semantic meaning, it exists as intermediate step which is fed into the parser.
-public struct Token: Equatable {
-    let type: TokenType
-    let rawValue: String
-    let range: Range<String.Index>
-}
-
-// Pretty prints the token to aid in debugging.
-extension Token: CustomStringConvertible {
-    public var description: String {
-        switch type {
-            case .whitespace:
-                if rawValue == " " {
-                    return "whitespace [space] [\(range.lowerBound)]"
-                } else if rawValue == "\t" {
-                    return "whitespace [tab]"
-                } else if rawValue == "\n" {
-                    return "whitespace [new line]"
-                } else {
-                    fatalError("Unknown whitespace")
-                }
-            case .comment:
-                return "comment [length: \(rawValue.count)] [\(range.lowerBound)]"
-            default:
-                return "\(type) \(rawValue)"
-        }
-    }
-}
-
 /// What the token represents in the source string.
 public enum TokenType: Hashable {
     case whitespace
