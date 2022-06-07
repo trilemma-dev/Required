@@ -8,7 +8,7 @@
 // Language definition:
 // https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/RequirementLang/RequirementLang.html
 
-public struct Tokenizer {
+struct Tokenizer {
     private init() { }
     
     private static let tokenizationOrder: [TokenType] = [
@@ -34,11 +34,11 @@ public struct Tokenizer {
     /// Creates a tokenized form of the `requirement` string if possible, or throws a `TokenizationError` if not.
     ///
     /// Just because it is possible to create a valid tokenization does not mean the requirement is semantically valid.
-    public static func tokenize(requirement: String) throws -> [Token] {
+    public static func tokenize(text: String) throws -> [Token] {
         var tokens = [Token]()
-        var currentIndex = requirement.startIndex
-        while currentIndex <= requirement.index(before: requirement.endIndex) {
-            let substring = requirement[currentIndex..<requirement.endIndex]
+        var currentIndex = text.startIndex
+        while currentIndex <= text.index(before: text.endIndex) {
+            let substring = text[currentIndex..<text.endIndex]
             let tokenCount = tokens.count
             for tokenType in tokenizationOrder {
                 if let token = tokenType.tokenize(substring: substring) {
@@ -48,7 +48,7 @@ public struct Tokenizer {
                 }
             }
             if tokens.count == tokenCount { // didn't append any tokens
-                throw TokenizationError(requirement: requirement, failureIndex: currentIndex)
+                throw TokenizationError(requirement: text, failureIndex: currentIndex)
             }
         }
 
@@ -57,7 +57,7 @@ public struct Tokenizer {
 }
 
 /// What the token represents in the source string.
-public enum TokenType: Hashable {
+enum TokenType: Hashable {
     case whitespace
     case comment
     case hashConstant

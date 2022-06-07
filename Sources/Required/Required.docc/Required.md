@@ -17,6 +17,10 @@
 - ``ParserError``
 - ``SecRequirementCopyAbstractSyntaxTree(_:_:_:)``
 
+### Tokenizer
+- ``Token``
+- ``TokenizationError``
+
 ### Parser - Requirements
 - ``Requirement``
 - ``NegationRequirement``
@@ -76,9 +80,3 @@
 - ``GuestSymbol``
 - ``LibrarySymbol``
 - ``DesignatedSymbol``
-
-### Tokenizer
-- ``Tokenizer``
-- ``Token``
-- ``TokenType``
-- ``TokenizationError``

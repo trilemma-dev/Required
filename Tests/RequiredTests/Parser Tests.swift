@@ -225,7 +225,7 @@ final class ParserTests: XCTestCase {
         """
         identifier = com.apple.Safari
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let constraint = try IdentifierConstraint.attemptParse(tokens: tokens)!.0 as! IdentifierConstraint
         switch constraint {
@@ -241,7 +241,7 @@ final class ParserTests: XCTestCase {
         """
         identifier "com.apple.Safari"
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let constraint = try IdentifierConstraint.attemptParse(tokens: tokens)!.0 as! IdentifierConstraint
         switch constraint {
@@ -260,7 +260,7 @@ final class ParserTests: XCTestCase {
         """
         info [MySpecialMarker] exists
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let constraint = try InfoConstraint.attemptParse(tokens: tokens)!.0 as! InfoConstraint
         XCTAssertEqual(constraint.key.value, "MySpecialMarker")
@@ -277,7 +277,7 @@ final class ParserTests: XCTestCase {
         """
         info [CFBundleShortVersionString] < "17.4"
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let constraint = try InfoConstraint.attemptParse(tokens: tokens)!.0 as! InfoConstraint
         XCTAssertEqual(constraint.key.value, "CFBundleShortVersionString")
@@ -297,7 +297,7 @@ final class ParserTests: XCTestCase {
         """
         entitlement ["com.apple.security.personal-information.calendars"] = tru*
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let constraint = try EntitlementConstraint.attemptParse(tokens: tokens)!.0 as! EntitlementConstraint
         XCTAssertEqual(constraint.key.value, "com.apple.security.personal-information.calendars")
@@ -321,7 +321,7 @@ final class ParserTests: XCTestCase {
         """
         anchor trusted
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
         switch constraint {
@@ -342,7 +342,7 @@ final class ParserTests: XCTestCase {
         """
         certificate -4 trusted
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
         switch constraint {
@@ -363,7 +363,7 @@ final class ParserTests: XCTestCase {
         """
         anchor apple
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
         switch constraint {
@@ -379,7 +379,7 @@ final class ParserTests: XCTestCase {
         """
         anchor apple generic
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
         switch constraint {
@@ -395,7 +395,7 @@ final class ParserTests: XCTestCase {
         """
         anchor = H"0123456789ABCDEFFEDCBA98765432100A2BC5DA"
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
         switch constraint {
@@ -417,7 +417,7 @@ final class ParserTests: XCTestCase {
         """
         certificate leaf = H"0123456789ABCDEFFEDCBA98765432100A2BC5DA"
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
         switch constraint {
@@ -439,7 +439,7 @@ final class ParserTests: XCTestCase {
         """
         certificate leaf = "/path/to/cert"
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
         switch constraint {
@@ -461,7 +461,7 @@ final class ParserTests: XCTestCase {
         """
         certificate 2[field.42] = hello.world*
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let constraint = try CertificateConstraint.attemptParse(tokens: tokens)!.0 as! CertificateConstraint
         switch constraint {
@@ -499,7 +499,7 @@ final class ParserTests: XCTestCase {
         """
         cdhash H"d5800a216ffd83b116b7b0f6047cb7f570f49329"
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let constraint = try CodeDirectoryHashConstraint.attemptParse(tokens: tokens)!.0 as! CodeDirectoryHashConstraint
         XCTAssertEqual(constraint.hashConstantSymbol.value, "d5800a216ffd83b116b7b0f6047cb7f570f49329")
@@ -512,7 +512,7 @@ final class ParserTests: XCTestCase {
         """
         = hello
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
         switch fragment {
@@ -529,7 +529,7 @@ final class ParserTests: XCTestCase {
         """
         = *hello*
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
         switch fragment {
@@ -550,7 +550,7 @@ final class ParserTests: XCTestCase {
         """
         = *hello
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
         switch fragment {
@@ -571,7 +571,7 @@ final class ParserTests: XCTestCase {
         """
         = hello*
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
         switch fragment {
@@ -592,7 +592,7 @@ final class ParserTests: XCTestCase {
         """
         exists
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
         switch fragment {
@@ -608,7 +608,7 @@ final class ParserTests: XCTestCase {
         """
         >= hello
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
         let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
         switch fragment {
@@ -627,7 +627,7 @@ final class ParserTests: XCTestCase {
         """
         designated => entitlement["com.apple.security.app-sandbox"] = true
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         let requirementSet = try RequirementSet.attemptParse(tokens: tokens)!
         
         // designated => entitlement["com.apple.security.app-sandbox"] = true
@@ -651,7 +651,7 @@ final class ParserTests: XCTestCase {
         """
         host => anchor apple and identifier com.apple.perl designated => entitlement["com.apple.security.app-sandbox"] = true
         """
-        let tokens = try Tokenizer.tokenize(requirement: requirement).strippingWhitespaceAndComments()
+        let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         let requirementSet = try RequirementSet.attemptParse(tokens: tokens)!
         
         // host => anchor apple and identifier com.apple.perl

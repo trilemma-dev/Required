@@ -35,12 +35,12 @@ extension ParseResult {
 
 
 func parse<T: Requirement>(_ text: String, asType: T.Type) throws -> T {
-    let requirement = try Parser.parse(requirement: text).asRequirement()
+    let requirement = try Parser.parse(text: text).asRequirement()
     XCTAssert(requirement is T)
     
     return requirement as! T
 }
 
 func parseRequirementSet(_ text: String) throws -> RequirementSet {
-    try Parser.parse(requirement: text).asRequirementSet()
+    try Parser.parse(text: text).asRequirementSet()
 }

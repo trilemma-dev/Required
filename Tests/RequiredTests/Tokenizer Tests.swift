@@ -28,7 +28,7 @@ final class TokenizerTests: XCTestCase {
             (.identifier, "apple")
         ]
         let expectedTokens = createTokens(requirement: requirement, tokenDescriptions: tokenDescriptions)
-        let tokens = try Tokenizer.tokenize(requirement: requirement)
+        let tokens = try Tokenizer.tokenize(text: requirement)
         XCTAssertEqual(tokens, expectedTokens)
     }
     
@@ -109,7 +109,7 @@ final class TokenizerTests: XCTestCase {
         ]
         
         let expectedTokens = createTokens(requirement: requirement, tokenDescriptions: tokenDescriptions)
-        let tokens = try Tokenizer.tokenize(requirement: requirement)
+        let tokens = try Tokenizer.tokenize(text: requirement)
         XCTAssertEqual(expectedTokens, tokens)
     }
     
@@ -137,7 +137,7 @@ final class TokenizerTests: XCTestCase {
         ]
         
         let expectedTokens = createTokens(requirement: requirement, tokenDescriptions: tokenDescriptions)
-        let tokens = try Tokenizer.tokenize(requirement: requirement)
+        let tokens = try Tokenizer.tokenize(text: requirement)
         XCTAssertEqual(expectedTokens, tokens)
     }
     

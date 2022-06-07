@@ -10,8 +10,12 @@
 /// This token has no semantic meaning, it exists as intermediate step which is fed into the parser.
 public struct Token: Equatable {
     let type: TokenType
-    let rawValue: String
-    let range: Range<String.Index>
+    
+    /// The original text value this token represents.
+    public let rawValue: String
+    
+    /// The range this token represents in the textual representation of the requirement or requirement set.
+    public let range: Range<String.Index>
 }
 
 // Pretty prints the token to aid in debugging.

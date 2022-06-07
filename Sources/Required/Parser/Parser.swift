@@ -17,14 +17,27 @@ public enum ParseResult {
     }
 }
 
+/// Parses requirements and requirement sets into their abstract syntax tree form.
+///
+/// These requirements are expected to conform to Apple's
+/// [Code Signing Requirement Language](https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/RequirementLang/RequirementLang.html#//apple_ref/doc/uid/TP40005929-CH5-SW2).
 public struct Parser {
     private init() { }
     
-    public static func parse(requirement: String) throws -> ParseResult {
-        try parse(tokens: try Tokenizer.tokenize(requirement: requirement))
+    /// Parses the textual form of a requirement or requirement set.
+    ///
+    /// No compilation of the requirement occurs as part of parsing meaning the requirement or requirement set may not be valid; for example a referenced
+    /// certificate file may not exist which would cause compilation to fail.
+    ///
+    /// - Parameter text: The textual form of a requirement or requirement set.
+    /// - Returns: Either ``ParseResult/requirement(_:)`` or  ``ParseResult/requirementSet(_:)`` depending on the value provided.
+    /// - Throws: ``ParserError`` or ``TokenizationError`` if the value provided was not a valid requirement or requirement set.
+    public static func parse(text: String) throws -> ParseResult {
+        try parse(tokens: try Tokenizer.tokenize(text: text))
     }
     
-    public static func parse(tokens: [Token]) throws -> ParseResult {
+    // Internal implementation based on tokens
+    static func parse(tokens: [Token]) throws -> ParseResult {
         let strippedTokens = tokens.strippingWhitespaceAndComments()
         if let requirementSet = try RequirementSet.attemptParse(tokens: strippedTokens) {
             return .requirementSet(requirementSet)
@@ -192,24 +205,6 @@ public struct Parser {
         
         return parsedElements
     }
-}
-
-public enum ParserError: Error {
-    case invalid(description: String)
-    case invalidToken(description: String)
-    
-    case invalidRequirementSet(description: String)
-    
-    case invalidKeyFragment(description: String)
-    case invalidMatchFragment(description: String)
-    
-    case invalidAnd(description: String)
-    case invalidOr(description: String)
-    case invalidNegation(description: String)
-    case invalidIdentifier(description: String)
-    case invalidInfo(description: String)
-    case invalidCodeDirectoryHash(description: String)
-    case invalidCertificate(description: String)
 }
 
 // MARK: Requirement
