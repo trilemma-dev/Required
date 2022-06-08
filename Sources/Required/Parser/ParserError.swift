@@ -5,6 +5,7 @@
 //  Created by Josh Kaplan on 2022-06-08
 //
 
+/// An error when parsing tokens into requirements.
 public enum ParserError: Error {
     case invalid(description: String)
     case invalidToken(description: String)

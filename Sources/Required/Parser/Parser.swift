@@ -5,18 +5,6 @@
 //  Created by Josh Kaplan on 2022-05-14
 //
 
-public enum ParseResult {
-    case requirement(Requirement)
-    case requirementSet(RequirementSet)
-    
-    public func prettyPrint() {
-        switch self {
-            case .requirement(let requirement):       requirement.prettyPrint()
-            case .requirementSet(let requirementSet): requirementSet.prettyPrint()
-        }
-    }
-}
-
 /// Parses requirements and requirement sets into their abstract syntax tree form.
 ///
 /// These requirements are expected to conform to Apple's
@@ -66,7 +54,6 @@ public struct Parser {
                                                                     requirement: recursionResult.0,
                                                                     rightParenthesis: rightParenthesis)
                 parsedElements.append(parenthesesRequirement)
-                
             } else if nextToken?.type == .rightParenthesis {
                 if depth == 0 {
                     throw ParserError.invalidToken(description: ") was not matched by a starting (")
@@ -102,7 +89,7 @@ public struct Parser {
         }
         
         // parsedElements should now consist of:
-        //   Requirement (specifically various types which conformt to this protocol)
+        //   Requirement (specifically various types which conform to this protocol)
         //   NegationSymbol
         //   AndSymbol
         //   OrSymbol
@@ -207,122 +194,33 @@ public struct Parser {
     }
 }
 
-// MARK: Requirement
-
-public protocol Requirement {
-    func prettyPrint()
-    static var generalDescription: String { get }
-    var textForm: String { get }
-    var children: [Requirement] { get } // Will be empty if it has no children
-}
-
-public extension Requirement {
-    func prettyPrint() {
-        self.prettyPrintInternal(depth: 0, ancestorDepths: [UInt](), isLastChildOfParent: false)
-    }
+/// The abstract syntax tree result of parsing a requirement or requirement set.
+public enum ParseResult {
+    /// A ``Requirement`` result.
+    case requirement(Requirement)
     
-    private func prettyPrintInternal(depth: UInt, ancestorDepths: [UInt], isLastChildOfParent: Bool) {
-        // Padding per depth is three characters
-        var lineStart = ""
-        for i in 0..<depth {
-            if i == depth - 1 { // portion right before this element will be displayed
-                lineStart += isLastChildOfParent ? "\\--" : "|--"
-            } else if ancestorDepths.contains(i) { // whether a | needs to be drawn for an ancestor
-                lineStart += "|  "
-            } else { // general padding
-                lineStart += "   "
-            }
-        }
-        
-        if self.children.isEmpty { // base case - no children
-            print(lineStart + self.textForm)
-        } else {
-            print(lineStart + type(of: self).generalDescription)
-            for index in children.indices {
-                var ancestorDepths = ancestorDepths
-                if isLastChildOfParent {
-                    ancestorDepths.removeLast()
-                }
-                ancestorDepths += [depth]
-                
-                let isLast = (index == children.index(before: children.endIndex))
-                
-                children[index].prettyPrintInternal(depth: depth + 1,
-                                                    ancestorDepths: ancestorDepths,
-                                                    isLastChildOfParent: isLast)
-            }
+    /// A ``RequirementSet`` result.
+    case requirementSet(RequirementSet)
+    
+    /// The textual representation of this requirement or requirement set.
+    ///
+    /// The returned string will not necessarily match the initial text provided, for example comments are not preserved, but will be semantically equivalent.
+    public var textForm: String {
+        switch self {
+            case .requirement(let requirement):       return requirement.textForm
+            case .requirementSet(let requirementSet): return requirementSet.textForm
         }
     }
-}
-
-/// A constraint is the base case requirement, it contains no requirements nested within it
-public protocol Constraint: Requirement { }
-
-public extension Constraint {
-    var children: [Requirement] { [] }
-}
-
-// MARK: Compound requirements
-
-public struct ParenthesesRequirement: Requirement {
-    public static let generalDescription = "()"
     
-    let leftParenthesis: Token
-    let requirement: Requirement
-    let rightParenthesis: Token
-    
-    public var textForm: String {
-        "(\(requirement.textForm))"
-    }
-    
-    public var children: [Requirement] {
-        [requirement]
-    }
-}
-
-public struct NegationRequirement: Requirement {
-    public static let generalDescription = "!"
-    
-    let negationSymbol: NegationSymbol
-    let requirement: Requirement
-    
-    public var textForm: String {
-        "!\(requirement.textForm)"
-    }
-    
-    public var children: [Requirement] {
-        [requirement]
-    }
-}
-
-public struct AndRequirement: Requirement {
-    public static let generalDescription = "and"
-    
-    let lhs: Requirement
-    let andSymbol: AndSymbol
-    let rhs: Requirement
-    
-    public var textForm: String {
-        return "\(lhs.textForm) and \(rhs.textForm)"
-    }
-    
-    public var children: [Requirement] {
-        [lhs, rhs]
-    }
-}
-
-public struct OrRequirement: Requirement {
-    public static let generalDescription = "or"
-    
-    let lhs: Requirement
-    let orSymbol: OrSymbol
-    let rhs: Requirement
-    
-    public var textForm: String {
-        return "\(lhs.textForm) or \(rhs.textForm)"
-    }
-    
-    public var children: [Requirement] {
-        [lhs, rhs]
+    /// A description of this parse result which visualizes itself as an ASCII tree.
+    ///
+    /// The exact format of the returned string is subject to change and is only intended to be used for display purposes.
+    ///
+    /// The returned description is not valid for parsing purposes, see ``textForm`` if that is needed.
+    public var prettyDescription: String {
+        switch self {
+            case .requirement(let requirement):       return requirement.prettyDescription
+            case .requirementSet(let requirementSet): return requirementSet.prettyDescription
+        }
     }
 }

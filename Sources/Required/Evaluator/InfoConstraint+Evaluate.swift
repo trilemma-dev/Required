@@ -7,13 +7,13 @@
 
 import Foundation
 
-public extension InfoConstraint {
+extension InfoConstraint {
     func evaluateForStaticCode(_ staticCode: SecStaticCode) throws -> Evaluation {
         let signingInfo = try staticCode.readSigningInformation(options: [.signingInformation])
         
         // If no info dictionary, not possible to match
         guard let info = signingInfo[.infoPList] as? [String : Any] else {
-            return .constraintNotSatisfied(constraint: self, explanation: "No info property list present")
+            return .constraintNotSatisfied(self, explanation: "No info property list present")
         }
         
         return self.match.evaluate(actualValue: info[self.key.value], constraint: self)
@@ -22,7 +22,7 @@ public extension InfoConstraint {
     func evaluateForSelf() throws -> Evaluation {
         // If no info dictionary, not possible to match
         guard let info = Bundle.main.infoDictionary else {
-            return .constraintNotSatisfied(constraint: self, explanation: "No info property list present")
+            return .constraintNotSatisfied(self, explanation: "No info property list present")
         }
         
         return self.match.evaluate(actualValue: info[self.key.value], constraint: self)

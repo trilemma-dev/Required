@@ -8,7 +8,7 @@
 import Foundation
 import Security
 
-public extension CodeDirectoryHashConstraint {
+extension CodeDirectoryHashConstraint {
     func evaluateForStaticCode(_ staticCode: SecStaticCode) throws -> Evaluation {
         let signingInfo = try staticCode.readSigningInformation()
         // While the documentation for kSecCodeInfoUnique does not explicitly say it's used for cdhash, it describes
@@ -22,14 +22,14 @@ public extension CodeDirectoryHashConstraint {
         //
         // Using Apple created tools, the cdhash for an application/binary can be seen using `codesign -dvvv <path>`
         guard let hash = signingInfo[.unique] as? Data else {
-            return .constraintNotSatisfied(constraint: self, explanation: "Unique hash not present")
+            return .constraintNotSatisfied(self, explanation: "Unique hash not present")
         }
        
         if hashConstantSymbol.value.lowercased() == hash.hexEncodedString() {
-            return .constraintSatisfied(constraint: self)
+            return .constraintSatisfied(self)
         } else {
-            return .constraintNotSatisfied(constraint: self, explanation: "Hashes did not match.\n" +
-                                           "Expected: \(hashConstantSymbol.value.lowercased())\n" +
+            return .constraintNotSatisfied(self, explanation: "Hashes did not match. " +
+                                           "Expected: \(hashConstantSymbol.value.lowercased()) " +
                                            "Actual: \(hash.hexEncodedString())")
         }
     }

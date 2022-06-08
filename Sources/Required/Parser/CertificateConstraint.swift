@@ -5,22 +5,51 @@
 //  Created by Josh Kaplan on 2022-05-18
 //
 
+/// A constraint on certificates in the certificate chain used to validate the signature.
 public enum CertificateConstraint: Constraint {
-    public static let generalDescription = "certificate"
+    public static let signifier = "certificate"
     
-    // anchor apple
+    /// Apple's own code.
+    ///
+    /// Textually represented as `anchor apple`.
     case wholeApple(AnchorSymbol, AppleSymbol)
-    // anchor apple generic
+    
+    /// Code signed by Apple including code signed using a signing certificate issued by Apple to other developers.
+    ///
+    /// Textually represented as `anchor apple generic`.
     case wholeAppleGeneric(AnchorSymbol, AppleSymbol, GenericSymbol)
-    // certificate position = hash <- where hash is a constant
+    
+    /// A certificate at a specific position in the certificate chain hashes to a specific SHA1 value.
+    ///
+    /// Textually represented as `certificate position = hash` where `position` is a certificate position and `hash` is a SHA1 hash constant.
     case wholeHashConstant(CertificatePosition, EqualsSymbol, HashConstantSymbol)
-    // certificate position = hash <- where hash is a file path to a certificate file that will be hashed
+    
+    /// A certificate at a specific position in the certificate chain hashes to the same SHA1 value as the file referenced by a certificate file.
+    ///
+    /// Textually represented as `certificate position = filePath` where `position` is a certificate position and `filePath` is a certificate file.
     case wholeHashFilePath(CertificatePosition, EqualsSymbol, StringSymbol)
-    // certificate position[element] match expression
-    case element(CertificatePosition, ElementFragment, MatchFragment)
-    // certificate position[element] <- undocumented, frequently seen for designated requirements
-    case elementImplicitExists(CertificatePosition, ElementFragment)
+    
+    /// An element at a specific position in the certificate chain satisfies the match expression.
+    ///
+    /// Elements can either be a specific `subject` element such as `subject.CN` or an OID field value such as `field.1.2.840.113635.100.6.2.6`.
+    ///
+    /// Textually represented as: `certificate position[element] matchExpression` where `position` is a certificate position and
+    /// `matchExpresion` is a valid match expression.
+    case element(CertificatePosition, ElementExpression, MatchExpression)
+    
+    /// An element at a specific position in the certificate chain exists.
+    ///
+    /// Elements can either be a specific `subject` element such as `subject.CN` or an OID field value such as `field.1.2.840.113635.100.6.2.6`.
+    ///
+    /// Textually represented as: `certificate position[element]` where `position` is a certificate position.
+    ///
+    /// >Note: This constraint form is not documented by Apple but is extremely common in app's designated requirements.
+    case elementImplicitExists(CertificatePosition, ElementExpression)
+    
     // certificate position trusted
+    /// A certificate at a specific position in the certificate chain is trusted in the system's Trust Settings database.
+    ///
+    /// Textually represented as: `certificate position trusted` where `position` is a certificate position.
     case trusted(CertificatePosition, TrustedSymbol)
     
     static func attemptParse(tokens: [Token]) throws -> (Requirement, [Token])? {
@@ -78,11 +107,11 @@ public enum CertificateConstraint: Constraint {
         } else if nextToken.type == .leftBracket { // certificate position[element] match expression
                                                    //                   OR
                                                    // certificate position[element]
-            let elementFragmentResult = try ElementFragment.attemptParse(tokens: remainingTokens)
+            let elementFragmentResult = try ElementExpression.attemptParse(tokens: remainingTokens)
             remainingTokens = elementFragmentResult.1
             
             // certificate position[element] match expression
-            if let matchResult = try MatchFragment.attemptParse(tokens: remainingTokens) {
+            if let matchResult = try MatchExpression.attemptParse(tokens: remainingTokens) {
                 certificateConstraint = .element(position, elementFragmentResult.0, matchResult.0)
                 remainingTokens = matchResult.1
             } else { // certificate position[element]
@@ -112,6 +141,25 @@ public enum CertificateConstraint: Constraint {
                 return "\(position.textForm)\(element.textForm)"
             case .trusted(let position, _):
                 return "\(position.textForm) trusted"
+        }
+    }
+    
+    public var sourceRange: Range<String.Index> {
+        switch self {
+            case .wholeApple(let anchor, let apple):
+                return anchor.sourceToken.range.lowerBound..<apple.sourceToken.range.upperBound
+            case .wholeAppleGeneric(let anchor, _, let generic):
+                return anchor.sourceToken.range.lowerBound..<generic.sourceToken.range.upperBound
+            case .wholeHashConstant(let position, _, let hashConstant):
+                return position.sourceLowerBound..<hashConstant.sourceToken.range.upperBound
+            case .wholeHashFilePath(let position, _, let string):
+                return position.sourceLowerBound..<string.sourceToken.range.upperBound
+            case .element(let position, _, let match):
+                return position.sourceLowerBound..<match.sourceUpperBound
+            case .elementImplicitExists(let position, let element):
+                return position.sourceLowerBound..<element.rightBracket.range.upperBound
+            case .trusted(let position, let trusted):
+                return position.sourceLowerBound..<trusted.sourceToken.range.upperBound
         }
     }
 }
@@ -205,6 +253,21 @@ public enum CertificatePosition {
                 return "certificate -\(integer.sourceToken.rawValue)"
             case .anchor(_):
                 return "anchor"
+        }
+    }
+    
+    public var sourceLowerBound: String.Index {
+        switch self {
+            case .root(let certificate, _):
+                return certificate.sourceToken.range.lowerBound
+            case .leaf(let certificate, _):
+                return certificate.sourceToken.range.lowerBound
+            case .positiveFromLeaf(let certificate, _):
+                return certificate.sourceToken.range.lowerBound
+            case .negativeFromAnchor(let certificate, _, _):
+                return certificate.sourceToken.range.lowerBound
+            case .anchor(let anchor):
+                return anchor.sourceToken.range.lowerBound
         }
     }
 }

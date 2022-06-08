@@ -7,7 +7,7 @@
 
 /// A lexical token for the Code Sign Requirement Language.
 ///
-/// This token has no semantic meaning, it exists as intermediate step which is fed into the parser.
+/// This token has no semantic meaning, it exists as an intermediate step which is fed into the parser.
 public struct Token: Equatable {
     let type: TokenType
     

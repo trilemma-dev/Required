@@ -7,12 +7,12 @@
 
 import Security
 
-public extension EntitlementConstraint {
+extension EntitlementConstraint {
     func evaluateForStaticCode(_ staticCode: SecStaticCode) throws -> Evaluation {
         let signingInfo = try staticCode.readSigningInformation(options: [.signingInformation])
         // If no entitlements dictionary, not possible to match
         guard let entitlements = signingInfo[.entitlementsDict] as? [String : Any] else {
-            return .constraintNotSatisfied(constraint: self, explanation: "No entitlements present")
+            return .constraintNotSatisfied(self, explanation: "No entitlements present")
         }
         
         return self.match.evaluate(actualValue: entitlements[self.key.value], constraint: self)

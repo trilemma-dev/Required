@@ -8,7 +8,7 @@
 import Foundation
 import Security
 
-public extension CertificateConstraint {
+extension CertificateConstraint {
     func evaluateForSelf() throws -> Evaluation {
         try evaluateForStaticCode(try SecCode.current.asStaticCode())
     }
@@ -16,7 +16,7 @@ public extension CertificateConstraint {
     func evaluateForStaticCode(_ staticCode: SecStaticCode) throws -> Evaluation {
         let signingInfo = try staticCode.readSigningInformation(options: [.signingInformation])
         guard let certificates = signingInfo[.infoCertificates] as? [SecCertificate], !certificates.isEmpty else {
-            return .constraintNotSatisfied(constraint: self, explanation: "No certificates present")
+            return .constraintNotSatisfied(self, explanation: "No certificates present")
         }
         
         switch self {
@@ -68,7 +68,7 @@ public extension CertificateConstraint {
         try evaluateWithValidityCheck(staticCode: staticCode) {
             "This was not recognized as Apple's own code. To do so one of the following must be true:\n" +
             "The code directory hash (cdhash) is in the trust cache.\n" +
-            "The root cert isan Apple Root CA and the intermediate cert's common name is Apple Code Signing " +
+            "The root cert is an Apple Root CA and the intermediate cert's common name is Apple Code Signing " +
             "Certification Authority while its organization value is Apple Inc.\n" +
             "The leaf certificate is one of the additionally trusted certificates on this Mac."
         }
@@ -79,10 +79,10 @@ public extension CertificateConstraint {
         // other developers, use the form
         //   anchor apple generic
         guard let rootCertificate = certificates.last else {
-            return .constraintNotSatisfied(constraint: self, explanation: "No root certificate")
+            return .constraintNotSatisfied(self, explanation: "No root certificate")
         }
         guard let rootCertificateDate = rootCertificate.data else {
-            return .constraintNotSatisfied(constraint: self, explanation: "Root certificate contains no data")
+            return .constraintNotSatisfied(self, explanation: "Root certificate contains no data")
         }
         
         // SHA256 hashes listed here: https://support.apple.com/en-us/HT212140
@@ -100,11 +100,11 @@ public extension CertificateConstraint {
         
         guard appleRootCAHashes.contains(rootCertificateDate.sha256()) else {
             let commonName = (try? rootCertificate.commonName) ?? "common name could not be determined"
-            let explanation = "Root certificate (\(commonName)) is not an Apple Root CA certificate"
-            return .constraintNotSatisfied(constraint: self, explanation: explanation)
+            let explanation = "Root certificate <\(commonName)> is not an Apple Root CA certificate"
+            return .constraintNotSatisfied(self, explanation: explanation)
         }
         
-        return .constraintSatisfied(constraint: self)
+        return .constraintSatisfied(self)
     }
     
     private func evaluateCertificateEqualsHash(
@@ -113,22 +113,22 @@ public extension CertificateConstraint {
         certificates: [SecCertificate]
     ) throws -> Evaluation {
         guard let certificate = certificateForPosition(position, certificates: certificates) else {
-            let explanation = "No certificate for position: \(position.textForm)"
-            return .constraintNotSatisfied(constraint: self, explanation: explanation)
+            let explanation = "No certificate for position \(position.textForm)"
+            return .constraintNotSatisfied(self, explanation: explanation)
         }
         guard let certificateData = certificate.data else {
-            let explanation = "No data representation for the certificate at position: \(position.textForm)"
-            return .constraintNotSatisfied(constraint: self, explanation: explanation)
+            let explanation = "No data representation for the certificate at position \(position.textForm)"
+            return .constraintNotSatisfied(self, explanation: explanation)
         }
         
         let actualHash = certificateData.sha1().hexEncodedString()
-        let requiredHash = hashValue.lowercased()
-        guard actualHash == requiredHash else {
-            let explanation = "SHA1 hashes did not match.\nRequired: \(requiredHash)\nActual: \(actualHash)"
-            return .constraintNotSatisfied(constraint: self, explanation: explanation)
+        let expectedHash = hashValue.lowercased()
+        guard actualHash == expectedHash else {
+            let explanation = "SHA1 hashes did not match. Expected: \(expectedHash) Actual: \(actualHash)"
+            return .constraintNotSatisfied(self, explanation: explanation)
         }
         
-        return .constraintSatisfied(constraint: self)
+        return .constraintSatisfied(self)
     }
     
     private func evaluateCertificateEqualsHashOfFilePath(
@@ -143,21 +143,21 @@ public extension CertificateConstraint {
                                                      hashValue: hashValue,
                                                      certificates: certificates)
         } catch {
-            let explanation = "Unable to hash file located at: \(filePath)"
-            return .constraintNotSatisfied(constraint: self, explanation: explanation)
+            let explanation = "Unable to hash file located at \(filePath)"
+            return .constraintNotSatisfied(self, explanation: explanation)
         }
     }
     
     private func evaluateCertificatePartMatch(
         staticCode: SecStaticCode,
         position: CertificatePosition,
-        element: ElementFragment,
-        match: MatchFragment,
+        element: ElementExpression,
+        match: MatchExpression,
         certificates: [SecCertificate]
     ) throws -> Evaluation {
         guard let certificate = certificateForPosition(position, certificates: certificates) else {
-            let explanation = "No certificate present for position: \(position.textForm)"
-            return .constraintNotSatisfied(constraint: self, explanation: explanation)
+            let explanation = "No certificate present for position \(position.textForm)"
+            return .constraintNotSatisfied(self, explanation: explanation)
         }
         
         // Certificate field by OID
@@ -178,11 +178,11 @@ public extension CertificateConstraint {
                         let oidStartIndex = element.value.index(after: periodIndex)
                         let oid = String(element.value[oidStartIndex..<element.value.endIndex])
                         let commonName = (try? certificate.commonName) ?? "common name could not be determined"
-                        return "The certificate (\(commonName)) does not contain OID: \(oid)"
+                        return "The certificate <\(commonName)> does not contain OID \(oid)"
                     }
                 default:
                     let explanation = "Only `exists` comparisons satisfy OID fields"
-                    return .constraintNotSatisfied(constraint: self, explanation: explanation)
+                    return .constraintNotSatisfied(self, explanation: explanation)
             }
         } else { // Part of a certificate
             let actualValue: String?
@@ -197,7 +197,7 @@ public extension CertificateConstraint {
                 default:
                     let explanation = "Invalid certificate element value: \(element.value). Value must be one of: " +
                         "subject.CN, subject.C, subject.D, subject.L, subject.O, subject.OU, or subject.STREET"
-                    return .constraintNotSatisfied(constraint: self, explanation: explanation)
+                    return .constraintNotSatisfied(self, explanation: explanation)
             }
             
             return match.evaluate(actualValue: actualValue, constraint: self)
@@ -207,12 +207,12 @@ public extension CertificateConstraint {
     private func evaluateCertificatePartMatchImplicitExists(
         staticCode: SecStaticCode,
         position: CertificatePosition,
-        element: ElementFragment,
+        element: ElementExpression,
         certificates: [SecCertificate]
     ) throws -> Evaluation {
         // Create a fake token such that a MatchFragment can be created which represents the implicit `exists`
         let fakeToken = Token(type: .identifier, rawValue: "exists", range: "".startIndex..<"".endIndex)
-        let implicitExists = MatchFragment.unarySuffix(ExistsSymbol(sourceToken: fakeToken))
+        let implicitExists = MatchExpression.unarySuffix(ExistsSymbol(sourceToken: fakeToken))
         
         return try evaluateCertificatePartMatch(staticCode: staticCode,
                                                 position: position,
@@ -232,12 +232,12 @@ public extension CertificateConstraint {
         
         // But first check if the certificate exists, if it doesn't then we can provide a more specific explanation
         guard let certificate = certificateForPosition(position, certificates: certificates) else {
-            let explanation = "No certificate present for position: \(position.textForm)"
-            return .constraintNotSatisfied(constraint: self, explanation: explanation)
+            let explanation = "No certificate present for position \(position.textForm)"
+            return .constraintNotSatisfied(self, explanation: explanation)
         }
         
         return try evaluateWithValidityCheck(staticCode: staticCode) {
-            "The certificate (\((try? certificate.commonName) ?? "common name could not be determined")) is not " +
+            "The certificate <\((try? certificate.commonName) ?? "common name could not be determined")> is not " +
             "marked as trusted in this system's Trust Settings database."
         }
     }
@@ -293,9 +293,11 @@ public extension CertificateConstraint {
     ) throws -> Evaluation {
         let result = SecStaticCodeCheckValidity(staticCode, SecCSFlags(), try SecRequirement.withString(self.textForm))
         if result == errSecSuccess {
-            return .constraintSatisfied(constraint: self)
+            return .constraintSatisfied(self)
         } else if result == errSecCSReqFailed {
-            return .constraintNotSatisfied(constraint: self, explanation: explanationProvider())
+            return .constraintNotSatisfied(self, explanation: explanationProvider())
+        } else if result == errSecCSBadResource {
+            return .constraintNotSatisfied(self, explanation: "A sealed resource is missing or invalid")
         } else {
             throw SecurityError.statusCode(result)
         }

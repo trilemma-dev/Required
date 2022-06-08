@@ -5,20 +5,8 @@
 //  Created by Josh Kaplan on 2022-05-18
 //
 
-public enum RequirementTag {
-    case host
-    case guest
-    case library
-    case designated
-}
-
-public struct RequirementSetElement {
-    public let tagSymbol: RequirementTagSymbol
-    public let setSymbol: RequirementSetSymbol
-    public let requirement: Requirement
-}
-
 public struct RequirementSet {
+    /// The set of requirement tags and their associated requirements.
     public let requirements: [RequirementTag : RequirementSetElement]
     
     private static let tagInitializers: [String : (Token) -> RequirementTagSymbol ] =
@@ -90,11 +78,69 @@ public struct RequirementSet {
         return RequirementSet(requirements: requirements)
     }
     
-    public func prettyPrint() {
-        for requirement in requirements.values {
-            print("\(requirement.tagSymbol) \(requirement.setSymbol)")
-            requirement.requirement.prettyPrint()
-            print("")
+    /// The textual representation of this requirement set.
+    ///
+    /// The returned string will not necessarily match the initial text provided, for example comments are not preserved, but will be semantically equivalent.
+    public var textForm: String {
+        var textForms = [String]()
+        for element in requirements.values {
+            let textForm = [element.tagSymbol.sourceToken.rawValue,
+                            element.setSymbol.sourceToken.rawValue,
+                            element.requirement.textForm].joined(separator: " ")
+            textForms.append(textForm)
         }
+        
+        return textForms.joined(separator: " ")
     }
+    
+    /// A description of this requirement set which visualizes itself as one or more ASCII trees.
+    ///
+    /// The exact format of the returned string is subject to change and is only intended to be used for display purposes. It currenty looks like:
+    /// ```
+    /// host => and
+    /// |--anchor apple
+    /// \--identifier com.apple.perl
+    ///
+    /// designated => entitlement["com.apple.security.app-sandbox"] exists
+    /// ```
+    /// 
+    /// The returned description is not a valid requirement for parsing purposes, see ``textForm`` if that is needed.
+    public var prettyDescription: String {
+        var prettyTexts = [String]()        
+        for requirement in requirements.values {
+            let tagAndSet = "\(requirement.tagSymbol) \(requirement.setSymbol) "
+            var prettyText = requirement.requirement.prettyDescriptionInternal(offset: UInt(tagAndSet.count),
+                                                                               depth: 0,
+                                                                               ancestorDepths: [],
+                                                                               isLastChildOfParent: false)
+                                                    .map{ $0.1 }
+                                                    .joined(separator: "\n")
+            // The string computed from prettyDescriptionInternal(...) will have every line in it padded out with spaces
+            // by tagAndSet's length. For the first line, we want to replace that whitespace with tagAndSet itself.
+            let range = prettyText.startIndex..<prettyText.index(prettyText.startIndex, offsetBy: tagAndSet.count)
+            prettyText.replaceSubrange(range, with: tagAndSet)
+            prettyTexts.append(prettyText)
+        }
+        
+        return prettyTexts.joined(separator: "\n\n")
+    }
+}
+
+extension RequirementSet: CustomStringConvertible {
+    public var description: String {
+        textForm
+    }
+}
+
+public enum RequirementTag {
+    case host
+    case guest
+    case library
+    case designated
+}
+
+public struct RequirementSetElement {
+    public let tagSymbol: RequirementTagSymbol
+    public let setSymbol: RequirementSetSymbol
+    public let requirement: Requirement
 }

@@ -46,12 +46,12 @@
 //  - The lack of wildcard character mentions for info dictionaries is an oversight, not behavioral difference
 //  - Only string constants (plus wildcards) can be matched against
 //    - Based on testing, hash constants are only for `cdhash` and integer constants for cert position
-public enum MatchFragment {
+public enum MatchExpression {
     case infix(InfixComparisonOperatorSymbol, StringSymbol)
     case infixEquals(EqualsSymbol, WildcardString)
     case unarySuffix(ExistsSymbol)
     
-    static func attemptParse(tokens: [Token]) throws -> (MatchFragment, [Token])? {
+    static func attemptParse(tokens: [Token]) throws -> (MatchExpression, [Token])? {
         guard let firstToken = tokens.first else {
             return nil
         }
@@ -86,7 +86,7 @@ public enum MatchFragment {
             throw ParserError.invalidMatchFragment(description: "No token present after comparison operator")
         }
         
-        let fragment: MatchFragment
+        let fragment: MatchExpression
         // Equals comparison allows for wildcard strings
         if let equalsOperator = infixOperator as? EqualsSymbol {
             if secondToken.type == .identifier {
@@ -150,6 +150,17 @@ public enum MatchFragment {
                 return "exists"
         }
     }
+    
+    var sourceUpperBound: String.Index {
+        switch self {
+            case .infix(_, let string):
+                return string.sourceToken.range.upperBound
+            case .infixEquals(_, let wildcard):
+                return wildcard.sourceUpperBound
+            case .unarySuffix(let exists):
+                return exists.sourceToken.range.upperBound
+        }
+    }
 }
 
 public enum WildcardString {
@@ -178,16 +189,27 @@ public enum WildcardString {
                 return "*\(string.sourceToken.rawValue)*"
         }
     }
+    
+    var sourceUpperBound: String.Index {
+        switch self {
+            case .prefixWildcard(_, let string):
+                return string.sourceToken.range.upperBound
+            case .postfixWildcard(_, let wildcard):
+                return wildcard.sourceToken.range.upperBound
+            case .prefixAndPostfixWildcard(_, _, let wildcard):
+                return wildcard.sourceToken.range.upperBound
+        }
+    }
 }
 
-public typealias ElementFragment = KeyFragment
+public typealias ElementExpression = KeyExpression
 
-public struct KeyFragment {
+public struct KeyExpression {
     public let leftBracket: Token
     public let keySymbol: StringSymbol
     public let rightBracket: Token
     
-    static func attemptParse(tokens: [Token]) throws -> (KeyFragment, [Token]) {
+    static func attemptParse(tokens: [Token]) throws -> (KeyExpression, [Token]) {
         var remainingTokens = tokens
         
         guard remainingTokens.first?.type == .leftBracket else {
@@ -205,7 +227,7 @@ public struct KeyFragment {
         }
         let rightBracket = remainingTokens.removeFirst()
         
-        return (KeyFragment(leftBracket: leftBracket, keySymbol: keySymbol, rightBracket: rightBracket),
+        return (KeyExpression(leftBracket: leftBracket, keySymbol: keySymbol, rightBracket: rightBracket),
                 remainingTokens)
     }
     

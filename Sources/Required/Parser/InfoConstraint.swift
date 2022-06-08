@@ -19,12 +19,19 @@
 //   info [MySpecialMarker] exists
 //
 // Specify key as a string constant.
+
+/// A constraint on the value corresponding to a key in the code's Info.plist file.
 public struct InfoConstraint: Constraint {
-    public static let generalDescription = "info"
+    public static let signifier = "info"
     
+    /// The symbol for the `info` keyword.
     public let infoSymbol: InfoSymbol
-    public let key: KeyFragment
-    public let match: MatchFragment
+    
+    /// The expression for the key portion of this constraint.
+    public let key: KeyExpression
+    
+    /// The expression for the match portion of this constraint.
+    public let match: MatchExpression
     
     static func attemptParse(tokens: [Token]) throws -> (Requirement, [Token])? {
         guard tokens.first?.type == .identifier, tokens.first?.rawValue == "info" else {
@@ -33,9 +40,9 @@ public struct InfoConstraint: Constraint {
         
         var remainingTokens = tokens
         let infoSymbol = InfoSymbol(sourceToken: remainingTokens.removeFirst())
-        let keyFragmentResult = try KeyFragment.attemptParse(tokens: remainingTokens)
+        let keyFragmentResult = try KeyExpression.attemptParse(tokens: remainingTokens)
         remainingTokens = keyFragmentResult.1
-        guard let matchResult = try MatchFragment.attemptParse(tokens: remainingTokens) else {
+        guard let matchResult = try MatchExpression.attemptParse(tokens: remainingTokens) else {
             throw ParserError.invalidInfo(description: "End tokens not a match expression")
         }
         let constraint = InfoConstraint(infoSymbol: infoSymbol, key: keyFragmentResult.0, match: matchResult.0)
@@ -45,5 +52,9 @@ public struct InfoConstraint: Constraint {
     
     public var textForm: String {
         return "info\(key.textForm) \(match.textForm)"
+    }
+    
+    public var sourceRange: Range<String.Index> {
+        infoSymbol.sourceToken.range.lowerBound..<match.sourceUpperBound
     }
 }

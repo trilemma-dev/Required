@@ -11,10 +11,15 @@
 // succeeds if the unique identifier string embedded in the code signature is exactly equal to constant. The equal sign
 // is optional in identifier expressions. Signing identifiers can be tested only for exact equality; the wildcard
 // character (*) can not be used with the identifier constraint, nor can identifiers be tested for inequality.
+
+/// A constraint on the unique identifier string embedded in the code signature.
 public enum IdentifierConstraint: Constraint {
-    public static let generalDescription = "identifier"
+    public static let signifier = "identifier"
     
+    /// When equality is explicitly indicated with use of the = symbol.
     case explicitEquality(IdentifierSymbol, EqualsSymbol, StringSymbol)
+    
+    /// When equality is implicitly indicated without the use of the = symbol.
     case implicitEquality(IdentifierSymbol, StringSymbol)
     
     static func attemptParse(tokens: [Token]) throws -> (Requirement, [Token])? {
@@ -53,16 +58,25 @@ public enum IdentifierConstraint: Constraint {
         return (identifierConstraint, remainingTokens)
     }
     
+    var identifier: IdentifierSymbol {
+        switch self {
+            case .explicitEquality(let identifier, _, _):   return identifier
+            case .implicitEquality(let identifier, _):      return identifier
+        }
+    }
+    
     var constant: StringSymbol {
         switch self {
-            case .explicitEquality(_, _, let stringSymbol):
-                return stringSymbol
-            case .implicitEquality(_, let stringSymbol):
-                return stringSymbol
+            case .explicitEquality(_, _, let string):   return string
+            case .implicitEquality(_, let string):      return string
         }
     }
     
     public var textForm: String {
         return "identifier \(constant.sourceToken.rawValue)"
+    }
+    
+    public var sourceRange: Range<String.Index> {
+        self.identifier.sourceToken.range.lowerBound..<constant.sourceToken.range.upperBound
     }
 }

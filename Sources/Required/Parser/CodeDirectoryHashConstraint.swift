@@ -11,11 +11,17 @@
 //
 // computes the canonical hash of the program’s CodeDirectory resource and succeeds if the value of this hash exactly
 // equals the specified hash constant.
+
+/// A constraint on the canonical hash of the program's CodeDirectory resource.
 public struct CodeDirectoryHashConstraint: Constraint {
-    public static let generalDescription = "cdhash"
     
-    let codeDirectoryHashSymbol: CodeDirectoryHashSymbol
-    let hashConstantSymbol: HashConstantSymbol
+    public static let signifier = "cdhash"
+    
+    /// The symbol for the `cdhash` keyword.
+    public let codeDirectoryHashSymbol: CodeDirectoryHashSymbol
+    
+    /// The symbol for the hash constant.
+    public let hashConstantSymbol: HashConstantSymbol
     
     static func attemptParse(tokens: [Token]) throws -> (Requirement, [Token])? {
         guard tokens.first?.type == .identifier, tokens.first?.rawValue == "cdhash" else {
@@ -35,5 +41,9 @@ public struct CodeDirectoryHashConstraint: Constraint {
     
     public var textForm: String {
         return "cdhash \(hashConstantSymbol.sourceToken.rawValue)"
+    }
+    
+    public var sourceRange: Range<String.Index> {
+        codeDirectoryHashSymbol.sourceToken.range.lowerBound..<hashConstantSymbol.sourceToken.range.upperBound
     }
 }

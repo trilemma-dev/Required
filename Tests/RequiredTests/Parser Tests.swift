@@ -514,7 +514,7 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
-        let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
+        let fragment = try MatchExpression.attemptParse(tokens: tokens)!.0
         switch fragment {
             case .infix(let comparison, let string):
                 XCTAssert(comparison is EqualsSymbol)
@@ -531,7 +531,7 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
-        let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
+        let fragment = try MatchExpression.attemptParse(tokens: tokens)!.0
         switch fragment {
             case .infixEquals(_, let wildcardString):
                 switch wildcardString {
@@ -552,7 +552,7 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
-        let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
+        let fragment = try MatchExpression.attemptParse(tokens: tokens)!.0
         switch fragment {
             case .infixEquals(_, let wildcardString):
                 switch wildcardString {
@@ -573,7 +573,7 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
-        let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
+        let fragment = try MatchExpression.attemptParse(tokens: tokens)!.0
         switch fragment {
             case .infixEquals(_, let wildcardString):
                 switch wildcardString {
@@ -594,7 +594,7 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
-        let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
+        let fragment = try MatchExpression.attemptParse(tokens: tokens)!.0
         switch fragment {
             case .unarySuffix(_):
                 break
@@ -610,7 +610,7 @@ final class ParserTests: XCTestCase {
         """
         let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         
-        let fragment = try MatchFragment.attemptParse(tokens: tokens)!.0
+        let fragment = try MatchExpression.attemptParse(tokens: tokens)!.0
         switch fragment {
             case .infix(let comparison, let string):
                 XCTAssert(comparison is GreaterThanOrEqualToSymbol)
@@ -649,7 +649,7 @@ final class ParserTests: XCTestCase {
     func testRequirementSet_twoRequirements() throws {
         let requirement =
         """
-        host => anchor apple and identifier com.apple.perl designated => entitlement["com.apple.security.app-sandbox"] = true
+        host => anchor apple and identifier com.apple.perl designated => entitlement["com.apple.security.app-sandbox"] exists
         """
         let tokens = try Tokenizer.tokenize(text: requirement).strippingWhitespaceAndComments()
         let requirementSet = try RequirementSet.attemptParse(tokens: tokens)!
@@ -683,19 +683,19 @@ final class ParserTests: XCTestCase {
         }
         
         
-        // designated => entitlement["com.apple.security.app-sandbox"] = true
+        // designated => entitlement["com.apple.security.app-sandbox"] exists
         XCTAssertNotNil(requirementSet.requirements[.designated])
         let designatedRequirement = requirementSet.requirements[.designated]!
         
-        // entitlement["com.apple.security.app-sandbox"] = true
+        // entitlement["com.apple.security.app-sandbox"] exists
         XCTAssert(designatedRequirement.requirement is EntitlementConstraint)
         let entitlementConstraint = designatedRequirement.requirement as! EntitlementConstraint
         XCTAssertEqual(entitlementConstraint.key.value, "com.apple.security.app-sandbox")
         switch entitlementConstraint.match {
-            case .infix(_, let string):
-                XCTAssertEqual(string.value, "true")
+            case .unarySuffix(_):
+                break
             default:
-                XCTFail("Expected infix")
+                XCTFail("Expected unarySuffix")
         }
     }
 }

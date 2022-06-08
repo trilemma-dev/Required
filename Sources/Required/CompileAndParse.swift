@@ -37,20 +37,24 @@ public func SecRequirementCopyAbstractSyntaxTree(
     // Because we now have the text form of a compiled requirement, tokenization and parsing should always succeed.
     // If it does not that's an implementation error of the tokenizer or parser, not an error of the API user.
     do {
-        let parseResult = try Parser.parse(text: text)
         // A SecRequirement must be a Requirement, not a RequirementSet
-        guard let requirementResult = parseResult as? Requirement else {
-            return errSecInternalError
+        switch try Parser.parse(text: text) {
+            case .requirement(let requirement):
+                ast = requirement
+                return errSecSuccess
+            case .requirementSet(_):
+                return errSecInternalError
         }
-        ast = requirementResult
     } catch {
         return errSecInternalError
     }
-    
-    return errSecSuccess
 }
 
 public extension Parser {
+    /// Parses a code requirement object.
+    ///
+    /// - Parameter requirement: A valid code requirement object.
+    /// - Returns: The abstract syntax tree representation of the `requirement`.
     static func parse(requirement: SecRequirement) throws -> Requirement {
         var ast: Requirement?
         let result = SecRequirementCopyAbstractSyntaxTree(requirement, SecCSFlags(), &ast)
@@ -63,12 +67,22 @@ public extension Parser {
 }
 
 public extension Requirement {
+    /// Compiles this abstract representation of a requirement into a `SecRequirement`.
+    ///
+    /// - Returns: A valid code requirement object.
+    /// - Throws: If compilation fails, for example because a referenced certificate file does not actually exist.
     func compile() throws -> SecRequirement {
         try SecRequirement.withString(self.textForm)
     }
 }
 
 public extension RequirementSet {
+    
+    
+    /// Compiles this abstract representation of a requirement set into a dictionary of `SecRequirementType` and `SecRequirement`.
+    ///
+    /// - Returns: A dictionary with values of valid code requirement object.
+    /// - Throws: If compilation fails, for example because a requirement's referenced certificate file does not actually exist.
     func compile() throws -> [SecRequirementType : SecRequirement] {
         var compiledSet = [SecRequirementType : SecRequirement]()
         for (tag, requirementElement) in self.requirements {
