@@ -11,7 +11,8 @@ Apple provides a compiler for their Code Signing Requirement Language in the for
 [`SecRequirementCreateWithString`](https://developer.apple.com/documentation/security/1394522-secrequirementcreatewithstring),
 but does not expose a parser and its corresponding abstract syntax tree. This package does precisely that.
 
-While Apple does provide an evaluator for a `SecRequirement` in the form of
+While Apple does provide an evaluator for a 
+[`SecRequirement`](https://developer.apple.com/documentation/security/secrequirement) in the form of
 [`SecStaticCodeCheckValidity`](https://developer.apple.com/documentation/security/1395784-secstaticcodecheckvalidity),
 there is no ability to see _why_ validation has failed. This package provides detailed explanations.
 
@@ -34,9 +35,8 @@ print("\nEvaluation tree:")
 print(evaluation.prettyDescription)
 ```
 
-Requirements can be provided either as
- [`SecRequirement`](https://developer.apple.com/documentation/security/secrequirement)s as shown in the above code
-snippet or as `String`s. Running this example outputs:
+Requirements can be provided either as `SecRequirement`s as shown in the above code snippet or as `String`s. Running
+this example outputs:
 ```
 Does Numbers.app satisfy its designated requirement?
 Yes

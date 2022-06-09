@@ -19,7 +19,7 @@ public struct Parser {
     ///
     /// - Parameter text: The textual form of a requirement or requirement set.
     /// - Returns: Either ``ParseResult/requirement(_:)`` or  ``ParseResult/requirementSet(_:)`` depending on the value provided.
-    /// - Throws: ``ParserError`` or ``TokenizationError`` if the value provided was not a valid requirement or requirement set.
+    /// - Throws: If the value provided was not a valid requirement or requirement set.
     public static func parse(text: String) throws -> ParseResult {
         try parse(tokens: try Tokenizer.tokenize(text: text))
     }
