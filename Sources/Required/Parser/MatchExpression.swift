@@ -1,8 +1,8 @@
 //
-//  ConstraintElements.swift
+//  MatchExpression.swift
 //  Required
 //
-//  Created by Josh Kaplan on 2022-05-18
+//  Created by Josh Kaplan on 2022-06-09
 //
 
 // From Apple:
@@ -46,9 +46,21 @@
 //  - The lack of wildcard character mentions for info dictionaries is an oversight, not behavioral difference
 //  - Only string constants (plus wildcards) can be matched against
 //    - Based on testing, hash constants are only for `cdhash` and integer constants for cert position
+
+/// An expression of comparison or existence.
 public enum MatchExpression {
+    /// A comparison match expression for `=`, `<`, `>`, `<=`, or `>=` with a string.
+    ///
+    /// `=` match expressions with a wildcard string are represented by ``infixEquals(_:_:)``.
     case infix(InfixComparisonOperatorSymbol, StringSymbol)
+    
+    /// An `=` match expression with a ``WildcardString``.
+    ///
+    /// This type of expression is not a true equality comparison, it instead checks if a string begins with, ends with, or contains the wildcard string. True equality
+    /// comparisons are represented by ``infix(_:_:)``.
     case infixEquals(EqualsSymbol, WildcardString)
+    
+    /// An `exists` match expression.
     case unarySuffix(ExistsSymbol)
     
     static func attemptParse(tokens: [Token]) throws -> (MatchExpression, [Token])? {
@@ -64,7 +76,7 @@ public enum MatchExpression {
             return (.unarySuffix(existsOperator), remainingTokens)
         }
         
-        // infix or not a match fragment
+        // infix or not a match expression
         let infixOperator: InfixComparisonOperatorSymbol
         switch firstToken.type {
             case .equals:
@@ -77,67 +89,56 @@ public enum MatchExpression {
                 infixOperator = LessThanOrEqualToSymbol(sourceToken: remainingTokens.removeFirst())
             case .greaterThanOrEqualTo:
                 infixOperator = GreaterThanOrEqualToSymbol(sourceToken: remainingTokens.removeFirst())
-            // Not a comparison operator, so can't be parsed as a match fragment
+            // Not a comparison operator, so can't be parsed as a match expression
             default:
                 return nil
         }
         
         guard let secondToken = remainingTokens.first else {
-            throw ParserError.invalidMatchFragment(description: "No token present after comparison operator")
+            throw ParserError.invalidMatchExpression(description: "No token present after comparison operator")
         }
         
-        let fragment: MatchExpression
+        let expression: MatchExpression
         // Equals comparison allows for wildcard strings
         if let equalsOperator = infixOperator as? EqualsSymbol {
             if secondToken.type == .identifier {
                 let stringSymbol = StringSymbol(sourceToken: remainingTokens.removeFirst())
                 if let thirdToken = remainingTokens.first, thirdToken.type == .wildcard { // constant*
                     let wildcardSymbol = WildcardSymbol(sourceToken: remainingTokens.removeFirst())
-                    fragment = .infixEquals(equalsOperator, .postfixWildcard(stringSymbol, wildcardSymbol))
+                    expression = .infixEquals(equalsOperator, .postfixWildcard(stringSymbol, wildcardSymbol))
                 } else { // constant
-                    fragment = .infix(equalsOperator, stringSymbol)
+                    expression = .infix(equalsOperator, stringSymbol)
                 }
             } else if secondToken.type == .wildcard {
                 let wildcardSymbol = WildcardSymbol(sourceToken: remainingTokens.removeFirst())
                 guard let thirdToken = remainingTokens.first, thirdToken.type == .identifier else {
-                    throw ParserError.invalidMatchFragment(description: "No identifier token present after wildcard " +
-                                                            "token: \(secondToken)")
+                    let description = "No identifier token present after wildcard token: \(secondToken)"
+                    throw ParserError.invalidMatchExpression(description: description)
                 }
                 
                 let stringSymbol = StringSymbol(sourceToken: remainingTokens.removeFirst())
                 if let fourthToken = remainingTokens.first, fourthToken.type == .wildcard { // *constant*
                     let secondWildcardSymbol = WildcardSymbol(sourceToken: remainingTokens.removeFirst())
-                    fragment = .infixEquals(equalsOperator, .prefixAndPostfixWildcard(wildcardSymbol,
+                    expression = .infixEquals(equalsOperator, .prefixAndPostfixWildcard(wildcardSymbol,
                                                                                              stringSymbol,
                                                                                              secondWildcardSymbol))
                 } else { // *constant
-                    fragment = .infixEquals(equalsOperator, .prefixWildcard(wildcardSymbol, stringSymbol))
+                    expression = .infixEquals(equalsOperator, .prefixWildcard(wildcardSymbol, stringSymbol))
                 }
             } else {
-                throw ParserError.invalidMatchFragment(description: "Token after comparison operator neither a " +
-                                                        "wildcard nor an identifier. Token: \(secondToken).")
+                let description = "Token after comparison operator is neither a wildcard nor an identifier. " +
+                                  "Token: \(secondToken)."
+                throw ParserError.invalidMatchExpression(description: description)
             }
         } else { // All other comparisons only allow for string symbol comparisons (no wildcards)
             guard secondToken.type == .identifier else {
-                throw ParserError.invalidMatchFragment(description: "Token after comparison operator is not " +
-                                                        "an identifier. Token: \(secondToken)")
+                let description = "Token after comparison operator is not an identifier. Token: \(secondToken)"
+                throw ParserError.invalidMatchExpression(description: description)
             }
-            fragment = .infix(infixOperator, StringSymbol(sourceToken: remainingTokens.removeFirst()))
+            expression = .infix(infixOperator, StringSymbol(sourceToken: remainingTokens.removeFirst()))
         }
         
-        return (fragment, remainingTokens)
-    }
-    
-    
-    var description: [String] {
-        switch self {
-            case .infix(let infixComparisonOperator, let stringSymbol):
-                return [infixComparisonOperator.sourceToken.rawValue, stringSymbol.value]
-            case .infixEquals(_, let wildcardString):
-                return ["="] + wildcardString.description
-            case .unarySuffix(_):
-                return ["exists"]
-        }
+        return (expression, remainingTokens)
     }
     
     var textForm: String {
@@ -153,93 +154,9 @@ public enum MatchExpression {
     
     var sourceUpperBound: String.Index {
         switch self {
-            case .infix(_, let string):
-                return string.sourceToken.range.upperBound
-            case .infixEquals(_, let wildcard):
-                return wildcard.sourceUpperBound
-            case .unarySuffix(let exists):
-                return exists.sourceToken.range.upperBound
+            case .infix(_, let string):         return string.sourceToken.range.upperBound
+            case .infixEquals(_, let wildcard): return wildcard.sourceUpperBound
+            case .unarySuffix(let exists):      return exists.sourceToken.range.upperBound
         }
-    }
-}
-
-public enum WildcardString {
-    case prefixWildcard(WildcardSymbol, StringSymbol)
-    case postfixWildcard(StringSymbol, WildcardSymbol)
-    case prefixAndPostfixWildcard(WildcardSymbol, StringSymbol, WildcardSymbol)
-    
-    var description: [String] {
-        switch self {
-            case .prefixWildcard(_, let stringSymbol):
-                return ["*", stringSymbol.value]
-            case .postfixWildcard(let stringSymbol, _):
-                return [stringSymbol.value, "*"]
-            case .prefixAndPostfixWildcard(_, let stringSymbol, _):
-                return ["*", stringSymbol.value, "*"]
-        }
-    }
-    
-    var textForm: String {
-        switch self {
-            case .prefixWildcard(_, let string):
-                return "*\(string.sourceToken.rawValue)"
-            case .postfixWildcard(let string, _):
-                return "\(string.sourceToken.rawValue)*"
-            case .prefixAndPostfixWildcard(_, let string, _):
-                return "*\(string.sourceToken.rawValue)*"
-        }
-    }
-    
-    var sourceUpperBound: String.Index {
-        switch self {
-            case .prefixWildcard(_, let string):
-                return string.sourceToken.range.upperBound
-            case .postfixWildcard(_, let wildcard):
-                return wildcard.sourceToken.range.upperBound
-            case .prefixAndPostfixWildcard(_, _, let wildcard):
-                return wildcard.sourceToken.range.upperBound
-        }
-    }
-}
-
-public typealias ElementExpression = KeyExpression
-
-public struct KeyExpression {
-    public let leftBracket: Token
-    public let keySymbol: StringSymbol
-    public let rightBracket: Token
-    
-    static func attemptParse(tokens: [Token]) throws -> (KeyExpression, [Token]) {
-        var remainingTokens = tokens
-        
-        guard remainingTokens.first?.type == .leftBracket else {
-            throw ParserError.invalidKeyFragment(description: "First token is not [")
-        }
-        let leftBracket = remainingTokens.removeFirst()
-        
-        guard remainingTokens.first?.type == .identifier else {
-            throw ParserError.invalidKeyFragment(description: "Second token is not an identifier")
-        }
-        let keySymbol = StringSymbol(sourceToken: remainingTokens.removeFirst())
-        
-        guard remainingTokens.first?.type == .rightBracket else {
-            throw ParserError.invalidKeyFragment(description: "Third token is not ]")
-        }
-        let rightBracket = remainingTokens.removeFirst()
-        
-        return (KeyExpression(leftBracket: leftBracket, keySymbol: keySymbol, rightBracket: rightBracket),
-                remainingTokens)
-    }
-    
-    var value: String {
-        keySymbol.value
-    }
-    
-    var description: [String] {
-        return ["[", keySymbol.value, "]"]
-    }
-    
-    var textForm: String {
-        return "[\(keySymbol.sourceToken.rawValue)]"
     }
 }

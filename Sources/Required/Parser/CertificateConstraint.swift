@@ -164,11 +164,44 @@ public enum CertificateConstraint: Constraint {
     }
 }
 
+/// An element expression for a certificate.
+///
+/// Examples include:
+/// - `[subject.OU]`
+/// - `[field.1.2.840.113635.100.6.2.6]`
+public typealias ElementExpression = KeyExpression
+
+/// A position of a certificate within a certificate chain.
 public enum CertificatePosition {
-    case root(CertificateSymbol, RootPositionSymbol) // certificate root
-    case leaf(CertificateSymbol, LeafPositionSymbol) // certificate leaf
-    case positiveFromLeaf(CertificateSymbol, IntegerSymbol) // certificate 2
-    case negativeFromAnchor(CertificateSymbol, NegativePositionSymbol, IntegerSymbol) // certificate -3
+    /// The root certificate in the certificate chain.
+    ///
+    /// Textually represented as: `certificate root`
+    ///
+    /// The root certificate is the last certificate in the chain. It is equivalent to `anchor`.
+    case root(CertificateSymbol, RootPositionSymbol)
+    
+    /// The leaf certificate in the certificate chain.
+    ///
+    /// Textually represented as: `certificate leaf`
+    ///
+    /// The leaf certificate is the first certificate in the chain.
+    case leaf(CertificateSymbol, LeafPositionSymbol)
+    
+    /// The `n`th certificate in the certificate chain beyond the leaf certificate.
+    ///
+    /// Textually represented as: `certificate <unsigned integer>`
+    case positiveFromLeaf(CertificateSymbol, IntegerSymbol)
+    
+    /// The `n`th certificate in the certificate chain prior to the root certificate (anchor).
+    ///
+    /// Textually represent as: `certificate <negative integer>`
+    case negativeFromAnchor(CertificateSymbol, NegativePositionSymbol, IntegerSymbol)
+    
+    /// The anchor is the root certificate in the certificate chain.
+    ///
+    /// Textually represented as: `anchor`
+    ///
+    /// The anchor is the last certificate in the chain. It is equivalent to `certificate root`.
     case anchor(AnchorSymbol) // anchor
     
     // Note that it's not possible to express `certificate anchor` with the above despite the documentation implying
@@ -226,48 +259,23 @@ public enum CertificatePosition {
         return (position, remainingTokens)
     }
     
-    var description: [String] {
-        switch self {
-            case .root(_, _):
-                return ["certificate", "root"]
-            case .leaf(_, _):
-                return ["certificate", "leaf"]
-            case .positiveFromLeaf(_, let integer):
-                return ["certificate", integer.sourceToken.rawValue]
-            case .negativeFromAnchor(_, _, let integer):
-                return ["certificate", "-", integer.sourceToken.rawValue]
-            case .anchor(_):
-                return ["anchor"]
-        }
-    }
-    
     var textForm: String {
         switch self {
-            case .root(_, _):
-                return "certificate root"
-            case .leaf(_, _):
-                return "certificate leaf"
-            case .positiveFromLeaf(_, let integer):
-                return "certificate \(integer.sourceToken.rawValue)"
-            case .negativeFromAnchor(_, _, let integer):
-                return "certificate -\(integer.sourceToken.rawValue)"
-            case .anchor(_):
-                return "anchor"
+            case .root(_, _):                               return "certificate root"
+            case .leaf(_, _):                               return "certificate leaf"
+            case .positiveFromLeaf(_, let integer):         return "certificate \(integer.sourceToken.rawValue)"
+            case .negativeFromAnchor(_, _, let integer):    return "certificate -\(integer.sourceToken.rawValue)"
+            case .anchor(_):                                return "anchor"
         }
     }
     
-    public var sourceLowerBound: String.Index {
+    var sourceLowerBound: String.Index {
         switch self {
-            case .root(let certificate, _):
-                return certificate.sourceToken.range.lowerBound
-            case .leaf(let certificate, _):
-                return certificate.sourceToken.range.lowerBound
-            case .positiveFromLeaf(let certificate, _):
-                return certificate.sourceToken.range.lowerBound
-            case .negativeFromAnchor(let certificate, _, _):
-                return certificate.sourceToken.range.lowerBound
-            case .anchor(let anchor):
-                return anchor.sourceToken.range.lowerBound
+            case .root(let certificate, _):                     return certificate.sourceToken.range.lowerBound
+            case .leaf(let certificate, _):                     return certificate.sourceToken.range.lowerBound
+            case .positiveFromLeaf(let certificate, _):         return certificate.sourceToken.range.lowerBound
+            case .negativeFromAnchor(let certificate, _, _):    return certificate.sourceToken.range.lowerBound
+            case .anchor(let anchor):                           return anchor.sourceToken.range.lowerBound
         }
     }
 }

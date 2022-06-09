@@ -5,7 +5,7 @@
 //  Created by Josh Kaplan on 2022-05-19
 //
 
-/// Whether a ``Requirement`` was satisfied and if not an explanationf of why it was not.
+/// Whether a ``Requirement`` was satisfied and if not an explanation of why it was not.
 ///
 /// The results of an evaluation can be easily visualized with the ``prettyDescription`` property.
 public enum Evaluation {

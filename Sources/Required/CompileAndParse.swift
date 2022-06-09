@@ -7,7 +7,8 @@
 
 import Foundation
 
-// This file serves to bridge the abstract syntax tree `Requirement` and `RequirementSet` with `SecRequirement`
+// This file serves to bridge the abstract syntax tree `Requirement` and `RequirementSet` with `SecRequirement` and
+// `SecRequirementType`
 
 /// Converts a code requirement object into abstract syntax tree form.
 ///
@@ -77,8 +78,6 @@ public extension Requirement {
 }
 
 public extension RequirementSet {
-    
-    
     /// Compiles this abstract representation of a requirement set into a dictionary of `SecRequirementType` and `SecRequirement`.
     ///
     /// - Returns: A dictionary with values of valid code requirement object.

@@ -6,14 +6,14 @@
 //
 
 /// An error when parsing tokens into requirements.
-public enum ParserError: Error {
+enum ParserError: Error {
     case invalid(description: String)
     case invalidToken(description: String)
     
     case invalidRequirementSet(description: String)
     
     case invalidKeyFragment(description: String)
-    case invalidMatchFragment(description: String)
+    case invalidMatchExpression(description: String)
     
     case invalidAnd(description: String)
     case invalidOr(description: String)

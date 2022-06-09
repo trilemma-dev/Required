@@ -5,22 +5,23 @@
 //  Created by Josh Kaplan on 2022-05-18
 //
 
+/// A collection of distinct requirements, each tagged with a type code.
 public struct RequirementSet {
     /// The set of requirement tags and their associated requirements.
     public let requirements: [RequirementTag : RequirementSetElement]
     
-    private static let tagInitializers: [String : (Token) -> RequirementTagSymbol ] =
+    private static let tags: [String : (RequirementTag, (Token) -> RequirementTagSymbol) ] =
     [
-        "host" : HostSymbol.init(sourceToken:),
-        "guest" : GuestSymbol.init(sourceToken:),
-        "library" : LibrarySymbol.init(sourceToken:),
-        "designated" : DesignatedSymbol.init(sourceToken:)
+        "host" : (.host, HostSymbol.init(sourceToken:)),
+        "guest" : (.guest, GuestSymbol.init(sourceToken:)),
+        "library" : (.library, LibrarySymbol.init(sourceToken:)),
+        "designated" : (.designated, DesignatedSymbol.init(sourceToken:))
     ]
     
     static func attemptParse(tokens: [Token]) throws -> RequirementSet? {
         guard let firstToken = tokens.first,
               firstToken.type == .identifier,
-              tagInitializers.keys.contains(firstToken.rawValue) else {
+              tags.keys.contains(firstToken.rawValue) else {
             return nil
         }
         
@@ -56,12 +57,12 @@ public struct RequirementSet {
                 currentSetRange = tokens.index(after: currentSetSymbolIndex)..<tokens.index(before: nextSetIndex)
             }
             
-            guard let tagInitializer = tagInitializers[tokens[currentTagSymbolIndex].rawValue] else {
+            guard let tag = tags[tokens[currentTagSymbolIndex].rawValue] else {
                 let description = "\(tokens[currentTagSymbolIndex].rawValue) is not a valid requirement tag"
                 throw ParserError.invalidRequirementSet(description: description)
             }
             
-            let tagSymbol = tagInitializer(tokens[currentTagSymbolIndex])
+            let tagSymbol = tag.1(tokens[currentTagSymbolIndex])
             let setSymbol = RequirementSetSymbol(sourceToken: tokens[currentSetSymbolIndex])
             let requirementTokens = Array(tokens[currentSetRange])
             let parseResult = try Parser.parse(tokens: requirementTokens)
@@ -72,7 +73,7 @@ public struct RequirementSet {
             let setElement = RequirementSetElement(tagSymbol: tagSymbol,
                                                    setSymbol: setSymbol,
                                                    requirement: requirement)
-            requirements[tagSymbol.requirementTag] = setElement
+            requirements[tag.0] = setElement
         }
         
         return RequirementSet(requirements: requirements)
@@ -132,15 +133,29 @@ extension RequirementSet: CustomStringConvertible {
     }
 }
 
+/// A requirement tag code.
 public enum RequirementTag {
+    /// What hosts may run the code.
     case host
+    
+    /// What guests the code may run.
     case guest
+    
+    /// What libraries the code may link against.
     case library
+    
+    /// A designated requirement.
     case designated
 }
 
+/// A requirement and its associated tag which are part of a requirement set.
 public struct RequirementSetElement {
+    /// One of `host`, `guest`, `library`, or `designated`.
     public let tagSymbol: RequirementTagSymbol
+    
+    /// The symbol `=>`.
     public let setSymbol: RequirementSetSymbol
+    
+    /// The requirement.
     public let requirement: Requirement
 }

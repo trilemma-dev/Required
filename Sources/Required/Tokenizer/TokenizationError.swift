@@ -6,7 +6,7 @@
 //
 
 /// An error when tokenizing (lexing) a requirements string.
-public struct TokenizationError: Error {
+struct TokenizationError: Error {
     /// The requirement string which could not be tokenized successfully.
     let requirement: String
     
