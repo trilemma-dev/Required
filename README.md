@@ -1,5 +1,5 @@
 # Required
-Use this package to parse requirement and requirement sets into their abstract syntax tree form and then evaluate them.
+Parse requirement and requirement sets into their abstract syntax tree form and then evaluate them.
 
 Apple provides a compiler for their
 [Code Signing Requirement Language](https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/RequirementLang/RequirementLang.html)
