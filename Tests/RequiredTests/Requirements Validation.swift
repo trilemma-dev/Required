@@ -244,27 +244,4 @@ final class RequirementsValidation: XCTestCase {
         """
         )
     }
-    
-    
-    /*
-    func testEvaluationOfRequirements() {
-        let text =
-        """
-        certificate leaf [field.1.2.840.113635.100.6.2.6] = hello
-        """
-    
-        var requirement: SecRequirement?
-        let result = SecRequirementCreateWithString(text as CFString, SecCSFlags(), &requirement)
-        XCTAssertNotNil(requirement)
-        XCTAssertEqual(result, errSecSuccess)
-        
-        var code: SecCode?
-        SecCodeCopySelf(SecCSFlags(), &code)
-        
-        var staticCode: SecStaticCode?
-        SecCodeCopyStaticCode(code!, SecCSFlags(), &staticCode)
-        
-        let validityResult = SecStaticCodeCheckValidity(staticCode!, SecCSFlags(), requirement)
-        print(validityResult)
-    }*/
 }

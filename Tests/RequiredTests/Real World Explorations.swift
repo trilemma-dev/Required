@@ -30,7 +30,19 @@ final class RealWorldTests: XCTestCase {
             print("\n")
         }
     }*/
+    
+    /*
+    func testDesignatedRequirementOfTestCLT() throws {
+        let containingDir = URL(fileURLWithPath: #file).deletingLastPathComponent().deletingLastPathComponent()
+        let executableURL = URL(fileURLWithPath: "TestCLT", relativeTo: containingDir).absoluteURL
 
+        let designatedRequirement = designatedRequirement(url: executableURL).1!
+
+        let abstractRequirement = try Parser.parse(requirement: designatedRequirement)
+        print(abstractRequirement.prettyDescription)
+    }
+    */
+    
     func installedAppLocations() -> [URL] {
         var appURLs = [URL]()
         for dir in FileManager.default.urls(for: .allApplicationsDirectory, in: [.localDomainMask, .userDomainMask]) {

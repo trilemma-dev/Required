@@ -10,38 +10,6 @@ import Required
 
 final class EvaluationTests: XCTestCase {
     
-    // MARK: helper functions
-    
-    // Some tests are written against "self" which is the xctest runner which executes these tests:
-    // /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Xcode/Agents/xctest
-    
-    // This is a command line tool which lacks a certificate chain
-    func staticCodeForTestExecutable() -> SecStaticCode {
-        var staticCode: SecStaticCode?
-        SecStaticCodeCreateWithPath(TestExecutables.intelx86_64, SecCSFlags(), &staticCode)
-        
-        return staticCode!
-    }
-    
-    // TODO: stop testing against Safari for anything besides "anchor apple" and "anchor trusted"
-    // Use a test bundle instead
-    func staticCodeForSafari() -> SecStaticCode {
-        var staticCode: SecStaticCode?
-        let path = URL(fileURLWithPath: "/Applications/Safari.app") as CFURL
-        SecStaticCodeCreateWithPath(path, SecCSFlags(), &staticCode)
-        
-        return staticCode!
-    }
-    
-    // TODO: replace this with a test bundle
-    func staticCodeForSpotify() -> SecStaticCode {
-        var staticCode: SecStaticCode?
-        let path = URL(fileURLWithPath: "/Applications/Spotify.app") as CFURL
-        SecStaticCodeCreateWithPath(path, SecCSFlags(), &staticCode)
-        
-        return staticCode!
-    }
-    
     // MARK: Identifier
     
     func testIdentifierConstraint_evaluateForSelf_satisfied() throws {
@@ -65,7 +33,7 @@ final class EvaluationTests: XCTestCase {
     func testIdentifierConstraint_evaluateForStaticCode_satisfied() throws {
         let identifierConstraint = try parse(
         """
-        identifier "\(TestExecutables.Properties.Info.bundleIdentifier)"
+        identifier com.example.TestCLT
         """, asType: IdentifierConstraint.self)
         
         XCTAssertTrue(try identifierConstraint.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
@@ -85,7 +53,7 @@ final class EvaluationTests: XCTestCase {
     func testInfoConstraint_evaluateForStaticCode_comparison() throws {
         let infoConstraint = try parse(
         """
-        info[CFBundleVersion] > 1.2.0
+        info[CFBundleVersion] > 5.2.4
         """, asType: InfoConstraint.self)
         
         XCTAssertTrue(try infoConstraint.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
@@ -114,7 +82,7 @@ final class EvaluationTests: XCTestCase {
     func testEntitlementConstraint_evaluateForSelf_notSatisfied() throws {
         let entitlementConstraint = try parse(
         """
-        entitlement["com.foobar.not-an-entitlement"] = imagination.land
+        entitlement["com.foobar.not-an-entitlement"] >= imagination.land
         """, asType: EntitlementConstraint.self)
         
         XCTAssertFalse(try entitlementConstraint.evaluateForSelf().isSatisfied)
@@ -123,7 +91,7 @@ final class EvaluationTests: XCTestCase {
     func testEntitlementConstraint_evaluateForStaticCode_satisfied() throws {
         let entitlementConstraint = try parse(
         """
-        entitlement["com.apple.security.get-task-allow"] exists
+        entitlement["com.apple.developer.ClassKit-environment"] = *elop*
         """, asType: EntitlementConstraint.self)
         
         XCTAssertTrue(try entitlementConstraint.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
@@ -134,7 +102,7 @@ final class EvaluationTests: XCTestCase {
     func testCodeDirectoryHashConstraint() throws {
         let codeDirectoryHashConstraint = try parse(
         """
-        cdhash H"1ddfea9341b8f664067f714970b4283ed315700f"
+        cdhash H"2d95d400f14e84b7f2c08449d1fd6f9751f752f4"
         """, asType: CodeDirectoryHashConstraint.self)
         
         XCTAssert(try codeDirectoryHashConstraint.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
@@ -148,7 +116,13 @@ final class EvaluationTests: XCTestCase {
         anchor apple
         """, asType: CertificateConstraint.self)
         
-        XCTAssertTrue(try certificateConstraint.evaluateForStaticCode(staticCodeForSafari()).isSatisfied)
+        // We need to test this against an application from Apple that's "part of macOS"
+        // Safari meets this criteria and should commonly exist on the system
+        var staticCode: SecStaticCode?
+        let path = URL(fileURLWithPath: "/Applications/Safari.app") as CFURL
+        SecStaticCodeCreateWithPath(path, SecCSFlags(), &staticCode)
+        
+        XCTAssertTrue(try certificateConstraint.evaluateForStaticCode(staticCode!).isSatisfied)
     }
     
     func testCertificateConstraint_anchorAppleGeneric() throws {
@@ -157,7 +131,7 @@ final class EvaluationTests: XCTestCase {
         anchor apple generic
         """, asType: CertificateConstraint.self)
         
-        XCTAssertTrue(try certificateConstraint.evaluateForStaticCode(staticCodeForSpotify()).isSatisfied)
+        XCTAssertTrue(try certificateConstraint.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
     }
     
     func testCertificateConstraint_hashConstant() throws {
@@ -167,7 +141,7 @@ final class EvaluationTests: XCTestCase {
         anchor = H"611e5b662c593a08ff58d14ae22452d198df6c60"
         """, asType: CertificateConstraint.self)
         
-        XCTAssertTrue(try certificateConstraint.evaluateForStaticCode(staticCodeForSafari()).isSatisfied)
+        XCTAssertTrue(try certificateConstraint.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
     }
     
     func testCertificateConstraint_hashFilePath() throws {
@@ -183,25 +157,25 @@ final class EvaluationTests: XCTestCase {
         anchor = \(quotedCertificateString)
         """, asType: CertificateConstraint.self)
         
-        XCTAssertTrue(try certificateConstraint.evaluateForStaticCode(staticCodeForSafari()).isSatisfied)
+        XCTAssertTrue(try certificateConstraint.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
     }
     
     func testCertificateConstraint_element_match() throws {
         let certificateConstraint = try parse(
         """
-        certificate leaf[subject.OU] = "2FNC3A47ZF"
+        certificate leaf[subject.OU] = "R96J7HJPH8"
         """, asType: CertificateConstraint.self)
         
-        XCTAssertTrue(try certificateConstraint.evaluateForStaticCode(staticCodeForSpotify()).isSatisfied)
+        XCTAssertTrue(try certificateConstraint.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
     }
     
     func testCertificateConstraint_element_implicitExists() throws {
         let certificateConstraint = try parse(
         """
-        certificate leaf[field.1.2.840.113635.100.6.1.13]
+        certificate 1[field.1.2.840.113635.100.6.2.1]
         """, asType: CertificateConstraint.self)
         
-        XCTAssertTrue(try certificateConstraint.evaluateForStaticCode(staticCodeForSpotify()).isSatisfied)
+        XCTAssertTrue(try certificateConstraint.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
     }
     
     func testCertificateConstraint_trusted() throws {
@@ -210,6 +184,76 @@ final class EvaluationTests: XCTestCase {
         anchor trusted
         """, asType: CertificateConstraint.self)
         
-        XCTAssertTrue(try certificateConstraint.evaluateForStaticCode(staticCodeForSafari()).isSatisfied)
+        XCTAssertTrue(try certificateConstraint.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
+    }
+    
+    // MARK: helper functions
+    
+    // Some tests are written against "self" which is the xctest runner which executes these tests:
+    // /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Xcode/Agents/xctest
+    
+    // This is the command line tool TestCLT
+    func staticCodeForTestExecutable() -> SecStaticCode {
+        /*
+         `codesign -dvvv` output:
+         
+         Identifier=com.example.TestCLT
+         Format=Mach-O thin (x86_64)
+         CodeDirectory v=20500 size=799 flags=0x10000(runtime) hashes=14+7 location=embedded
+         Hash type=sha256 size=32
+         CandidateCDHash sha256=2d95d400f14e84b7f2c08449d1fd6f9751f752f4
+         CandidateCDHashFull sha256=2d95d400f14e84b7f2c08449d1fd6f9751f752f40c9a6fdc425da760f449de3c
+         Hash choices=sha256
+         CMSDigest=2d95d400f14e84b7f2c08449d1fd6f9751f752f40c9a6fdc425da760f449de3c
+         CMSDigestType=2
+         CDHash=2d95d400f14e84b7f2c08449d1fd6f9751f752f4
+         Signature size=4783
+         Authority=Apple Development: Joshua Kaplan (3U3GZ847WW)
+         Authority=Apple Worldwide Developer Relations Certification Authority
+         Authority=Apple Root CA
+         Signed Time=Jun 9, 2022 at 11:12:00 PM
+         Info.plist entries=2
+         TeamIdentifier=R96J7HJPH8
+         Runtime Version=12.1.0
+         Sealed Resources=none
+         Internal requirements count=1 size=184
+         */
+        
+        /*
+         `codesign -d --entitlements :-` output:
+         
+         <?xml version="1.0" encoding="UTF-8"?>
+         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+         <plist version="1.0">
+         <dict>
+             <key>com.apple.developer.ClassKit-environment</key>
+             <string>development</string>
+             <key>com.apple.security.app-sandbox</key>
+             <true/>
+             <key>com.apple.security.get-task-allow</key>
+             <true/>
+         </dict>
+         </plist>
+         */
+        
+        /*
+         Designated requirement as visualized by this package:
+         
+         and
+         |--and
+         |  |--and
+         |  |  |--identifier "com.example.TestCLT"
+         |  |  \--anchor apple generic
+         |  \--certificate leaf[subject.CN] = "Apple Development: Joshua Kaplan (3U3GZ847WW)"
+         \--certificate 1[field.1.2.840.113635.100.6.2.1]
+         */
+        
+        let containingDir = URL(fileURLWithPath: #file).deletingLastPathComponent().deletingLastPathComponent()
+        let executableURL = URL(fileURLWithPath: "TestCLT", relativeTo: containingDir).absoluteURL
+        
+        var staticCode: SecStaticCode?
+        SecStaticCodeCreateWithPath(executableURL as CFURL, SecCSFlags(), &staticCode)
+        
+        return staticCode!
     }
 }

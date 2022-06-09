@@ -8,7 +8,6 @@
 import XCTest
 import Required
 
-
 extension ParseResult {
     struct UnexpectedParseResult: Error { }
     
@@ -32,7 +31,6 @@ extension ParseResult {
         }
     }
 }
-
 
 func parse<T: Requirement>(_ text: String, asType: T.Type) throws -> T {
     let requirement = try Parser.parse(text: text).asRequirement()

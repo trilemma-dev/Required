@@ -152,6 +152,8 @@ The common requirements you'll see with OIDs are likely:
     - The leaf certificate is for a Mac App Store app
 - `certificate leaf[field.1.2.840.113635.100.6.1.13]`
     - This leaf certificate is for a Developer ID Application
+- `certificate 1[field.1.2.840.113635.100.6.2.1]`
+    - This intermediate certificate is for WWDR (Apple Worldwide Developer Relations)
 - `certificate 1[field.1.2.840.113635.100.6.2.6]`
     - This intermediate certificate is for the Developer ID CA (Certificate Authority)
 
