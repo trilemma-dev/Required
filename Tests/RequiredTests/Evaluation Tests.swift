@@ -187,6 +187,104 @@ final class EvaluationTests: XCTestCase {
         XCTAssertTrue(try certificateConstraint.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
     }
     
+    // MARK: Logical and
+    
+    func testLogicalAnd_bothTrue() throws {
+        let andRequirement = try parse(
+        """
+        certificate leaf[subject.OU] = "R96J7HJPH8" and certificate 1[field.1.2.840.113635.100.6.2.1]
+        """, asType: AndRequirement.self)
+        
+        XCTAssertTrue(try andRequirement.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
+    }
+    
+    func testLogicalAnd_oneTrue() throws {
+        let andRequirement = try parse(
+        """
+        certificate leaf[subject.OU] = "R96J7HJPH8" and entitlement["com.apple.developer.ClassKit-environment"] = prod
+        """, asType: AndRequirement.self)
+        
+        XCTAssertFalse(try andRequirement.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
+    }
+    
+    func testLogicalAnd_bothFalse() throws {
+        let andRequirement = try parse(
+        """
+        certificate leaf[subject.OU] = "HELLO_WORLD" and entitlement["com.apple.developer.ClassKit-environment"] = prod
+        """, asType: AndRequirement.self)
+        
+        XCTAssertFalse(try andRequirement.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
+    }
+    
+    // MARK: Logical or
+    
+    func testLogicalOr_bothTrue() throws {
+        let orRequirement = try parse(
+        """
+        certificate leaf[subject.OU] = "R96J7HJPH8" or certificate 1[field.1.2.840.113635.100.6.2.1]
+        """, asType: OrRequirement.self)
+        
+        XCTAssertTrue(try orRequirement.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
+    }
+    
+    func testLogicalOr_oneTrue() throws {
+        let orRequirement = try parse(
+        """
+        certificate leaf[subject.OU] = "R96J7HJPH8" or entitlement["com.apple.developer.ClassKit-environment"] = prod
+        """, asType: OrRequirement.self)
+        
+        XCTAssertTrue(try orRequirement.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
+    }
+    
+    func testLogicalOr_bothFalse() throws {
+        let orRequirement = try parse(
+        """
+        certificate leaf[subject.OU] = "HELLO_WORLD" or entitlement["com.apple.developer.ClassKit-environment"] = prod
+        """, asType: OrRequirement.self)
+        
+        XCTAssertFalse(try orRequirement.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
+    }
+    
+    // MARK: Negation
+    
+    func testNegation_nestedRequirementTrue() throws {
+        let negatedRequirement = try parse(
+        """
+        !certificate leaf[subject.OU] = "R96J7HJPH8"
+        """, asType: NegationRequirement.self)
+        
+        XCTAssertFalse(try negatedRequirement.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
+    }
+    
+    func testNegation_nestedRequirementFalse() throws {
+        let negatedRequirement = try parse(
+        """
+        !certificate leaf[subject.OU] = "HELLO_WORLD"
+        """, asType: NegationRequirement.self)
+        
+        XCTAssertTrue(try negatedRequirement.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
+    }
+    
+    // MARK: Parentheses
+    
+    func testParentheses_nestedRequirementTrue() throws {
+        let parenthesesRequirement = try parse(
+        """
+        (certificate leaf[subject.OU] = "R96J7HJPH8")
+        """, asType: ParenthesesRequirement.self)
+        
+        XCTAssertTrue(try parenthesesRequirement.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
+    }
+    
+    func testParentheses_nestedRequirementFalse() throws {
+        let parenthesesRequirement = try parse(
+        """
+        (certificate leaf[subject.OU] = "HELLO_WORLD")
+        """, asType: ParenthesesRequirement.self)
+        
+        XCTAssertFalse(try parenthesesRequirement.evaluateForStaticCode(staticCodeForTestExecutable()).isSatisfied)
+    }
+    
     // MARK: helper functions
     
     // Some tests are written against "self" which is the xctest runner which executes these tests:

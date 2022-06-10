@@ -12,15 +12,23 @@ extension EntitlementConstraint {
         let signingInfo = try staticCode.readSigningInformation(options: [.signingInformation])
         // If no entitlements dictionary, not possible to match
         guard let entitlements = signingInfo[.entitlementsDict] as? [String : Any] else {
-            return .constraintNotSatisfied(self, explanation: "No entitlements present")
+            return .constraintNotSatisfied(self, explanation: "No entitlements dictionary present")
+        }
+        guard let value = entitlements[self.key.value] else {
+            let explanation = "Entitlements dictionary has no value for key \(self.key.value)"
+            return .constraintNotSatisfied(self, explanation: explanation)
         }
         
-        return self.match.evaluate(actualValue: entitlements[self.key.value], constraint: self)
+        return self.match.evaluate(actualValue: value, constraint: self)
     }
     
     func evaluateForSelf() throws -> Evaluation {
-        let actualValue = try SecTask.current.valueForEntitlement(key: self.key.value)
+        let value = try SecTask.current.valueForEntitlement(key: self.key.value)
+        guard let value = value else {
+            let explanation = "Entitlements dictionary has no value for key \(self.key.value)"
+            return .constraintNotSatisfied(self, explanation: explanation)
+        }
         
-        return self.match.evaluate(actualValue: actualValue, constraint: self)
+        return self.match.evaluate(actualValue: value, constraint: self)
     }
 }

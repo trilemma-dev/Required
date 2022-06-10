@@ -104,7 +104,7 @@ public enum Evaluation {
     /// Constraints not satisfied:
     /// 1. The certificate <Apple Worldwide Developer Relations Certification Authority> does not contain OID 1.2.840.113635.100.6.2.6
     /// 2. The certificate <Apple Mac OS Application Signing> does not contain OID 1.2.840.113635.100.6.1.13
-    /// 3. Value not present
+    /// 3. The certificate <Apple Mac OS Application Signing> does not contain element subject.OU
     /// ```
     public var prettyDescription: String {
         let descriptions = self.requirement.prettyDescriptionInternal(offset: 0,

@@ -1,5 +1,5 @@
 //
-//  MatchFragment+Evaluate.swift
+//  MatchExpression+Evaluate.swift
 //  Required
 //
 //  Created by Josh Kaplan on 2022-05-20
@@ -8,11 +8,7 @@
 import Foundation
 
 extension MatchExpression {
-    func evaluate(actualValue: Any?, constraint: Constraint) -> Evaluation {
-        guard let actualValue = actualValue else {
-            return .constraintNotSatisfied(constraint, explanation: "Value not present")
-        }
-        
+    func evaluate(actualValue: Any, constraint: Constraint) -> Evaluation {
         switch self {
             case .infix(let operation, let expected):
                 // Inequality operations compare some value to a constant. The value and constant must be of the
@@ -36,8 +32,8 @@ extension MatchExpression {
                         }
                     case .compareEqualTo:
                         if (operation is EqualsSymbol) ||
-                            (operation is LessThanOrEqualToSymbol) ||
-                            (operation is GreaterThanOrEqualToSymbol) {
+                           (operation is LessThanOrEqualToSymbol) ||
+                           (operation is GreaterThanOrEqualToSymbol) {
                             return .constraintSatisfied(constraint)
                         } else {
                             let explanation = "\(actualValue) is equal to expected value \(expected.value)"
@@ -60,7 +56,8 @@ extension MatchExpression {
                 // the same matching rules as CFString (see CFString Reference).
                 guard let actualValue = actualValue as? String else {
                     let explanation = "The actual value is not a string, but the constraint is an equality " +
-                                      "comparison for a wildcard string. Actual: \(actualValue)"
+                                      "comparison for a wildcard string. Actual: \(actualValue) " +
+                                      "Actual Type: \(type(of: actualValue))"
                     return .constraintNotSatisfied(constraint, explanation: explanation)
                 }
                 
@@ -95,7 +92,7 @@ extension MatchExpression {
                 //   does not exist at all or is exactly the Boolean value false. An empty string and the number 0 are
                 //   considered to exist.
                 if actualValue is Bool, (actualValue as! Bool) == false {
-                    let explanation = "Actual value is exactly the Boolean value false"
+                    let explanation = "Actual value is exactly the boolean value false"
                     return .constraintNotSatisfied(constraint, explanation: explanation)
                 } else {
                     return .constraintSatisfied(constraint)

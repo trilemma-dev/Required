@@ -24,14 +24,13 @@ extension CodeDirectoryHashConstraint {
         guard let hash = signingInfo[.unique] as? Data else {
             return .constraintNotSatisfied(self, explanation: "Unique hash not present")
         }
-       
-        if hashConstantSymbol.value.lowercased() == hash.hexEncodedString() {
-            return .constraintSatisfied(self)
-        } else {
-            return .constraintNotSatisfied(self, explanation: "Hashes did not match. " +
-                                           "Expected: \(hashConstantSymbol.value.lowercased()) " +
-                                           "Actual: \(hash.hexEncodedString())")
+        guard hashConstantSymbol.value.lowercased() == hash.hexEncodedString() else {
+            let explanation = "Hashes did not match. Expected: \(hashConstantSymbol.value.lowercased()) " +
+                              "Actual: \(hash.hexEncodedString())"
+            return .constraintNotSatisfied(self, explanation: explanation)
         }
+       
+        return .constraintSatisfied(self)
     }
     
     func evaluateForSelf() throws -> Evaluation {

@@ -73,4 +73,23 @@ final class RealWorldTests: XCTestCase {
         
         return (staticCode, requirement)
     }
+    
+    /*
+    func testNumbersForDocumentation() throws {
+        // Retrieve the designated requirement for Numbers
+        let url = URL(fileURLWithPath: "/Applications/Numbers.app")
+        var code: SecStaticCode?
+        SecStaticCodeCreateWithPath(url as CFURL, [], &code)
+        var requirement: SecRequirement?
+        SecCodeCopyDesignatedRequirement(code!, [], &requirement)
+
+        // See whether and how Numbers satisifies its designated requirement
+        let abstractRequirement = try Parser.parse(requirement: requirement!)
+        let evaluation = try abstractRequirement.evaluateForStaticCode(code!)
+        print("Does \(url.lastPathComponent) satisfy its designated requirement?")
+        print(evaluation.isSatisfied ? "Yes" : "No")
+        print("\nEvaluation tree:")
+        print(evaluation.prettyDescription)
+    }
+    */
 }

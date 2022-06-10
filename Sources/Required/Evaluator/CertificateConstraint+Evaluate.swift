@@ -124,7 +124,9 @@ extension CertificateConstraint {
         let actualHash = certificateData.sha1().hexEncodedString()
         let expectedHash = hashValue.lowercased()
         guard actualHash == expectedHash else {
-            let explanation = "SHA1 hashes did not match. Expected: \(expectedHash) Actual: \(actualHash)"
+            let commonName = (try? certificate.commonName) ?? "common name could not be determined"
+            let explanation = "The certificate <\(commonName)>'s SHA1 hash did not match the expected value. " +
+                              "Expected: \(expectedHash) Actual: \(actualHash)"
             return .constraintNotSatisfied(self, explanation: explanation)
         }
         
@@ -200,6 +202,12 @@ extension CertificateConstraint {
                     return .constraintNotSatisfied(self, explanation: explanation)
             }
             
+            guard let actualValue = actualValue else {
+                let commonName = (try? certificate.commonName) ?? "common name could not be determined"
+                let explanation = "The certificate <\(commonName)> does not contain element \(element.value)"
+                return .constraintNotSatisfied(self, explanation: explanation)
+            }
+            
             return match.evaluate(actualValue: actualValue, constraint: self)
         }
     }
@@ -210,7 +218,7 @@ extension CertificateConstraint {
         element: ElementExpression,
         certificates: [SecCertificate]
     ) throws -> Evaluation {
-        // Create a fake token such that a MatchFragment can be created which represents the implicit `exists`
+        // Create a fake token such that a MatchExpression can be created which represents the implicit `exists`
         let fakeToken = Token(type: .identifier, rawValue: "exists", range: "".startIndex..<"".endIndex)
         let implicitExists = MatchExpression.unarySuffix(ExistsSymbol(sourceToken: fakeToken))
         

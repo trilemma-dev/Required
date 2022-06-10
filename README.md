@@ -56,10 +56,18 @@ and {true}
 Constraints not satisfied:
 1. The certificate <Apple Worldwide Developer Relations Certification Authority> does not contain OID 1.2.840.113635.100.6.2.6
 2. The certificate <Apple Mac OS Application Signing> does not contain OID 1.2.840.113635.100.6.1.13
-3. Value not present
+3. The certificate <Apple Mac OS Application Signing> does not contain element subject.OU
 ```
 
 Each leaf node of the evaluation tree which was not satisfied is annotated with a superscript number. Those numbers are
 then used at the bottom to provide explanations for why the leaf node was not satified. 
 
 See this package's DocC documentation for more details.
+
+## Apple Resources
+Apple has published several documents that discuss to varying degrees their requirements language:
+- [Code Signing Requirement Language](https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/RequirementLang/RequirementLang.html#//apple_ref/doc/uid/TP40005929-CH5-SW1)
+- [TN2206: macOS Code Signing In Depth](https://developer.apple.com/library/archive/technotes/tn2206/_index.html)
+- [TN3125: Inside Code Signing: Provisioning Profiles](https://developer.apple.com/documentation/technotes/tn3125-inside-code-signing-provisioning-profiles)
+- [TN3126: Inside Code Signing: Hashes](https://developer.apple.com/documentation/technotes/tn3126-inside-code-signing-hashes)
+- [TN3127: Inside Code Signing: Requirements](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements)

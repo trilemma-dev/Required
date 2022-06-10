@@ -3,8 +3,7 @@
 Parser and evaluator for Apple's [Code Signing Requirement Language](https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/RequirementLang/RequirementLang.html).
 
 ## Overview
-
-Use this package to parse requirement and requirement sets into their abstract syntax tree form and then evaluate them.
+Parse requirement and requirement sets into their abstract syntax tree form and then evaluate them.
 
 ### Motivation
 Apple provides a compiler for their Code Signing Requirement Language in the form of
@@ -60,7 +59,7 @@ and {true}
 Constraints not satisfied:
 1. The certificate <Apple Worldwide Developer Relations Certification Authority> does not contain OID 1.2.840.113635.100.6.2.6
 2. The certificate <Apple Mac OS Application Signing> does not contain OID 1.2.840.113635.100.6.1.13
-3. Value not present
+3. The certificate <Apple Mac OS Application Signing> does not contain element subject.OU
 ```
 
 Each leaf node of the evaluation tree which was not satisfied is annotated with a superscript number. Those numbers are
@@ -111,7 +110,7 @@ There are five types of `Constraints`:
 - ``CodeDirectoryHashConstraint``
 
 Constraints are always made up of multiple constituent parts, but they never have any child `Requirement`s. For example
-the `InfoConstraint` has a properties which expose its ``InfoConstraint/infoSymbol``, ``InfoConstraint/key``, and
+`InfoConstraint` has properties which expose its ``InfoConstraint/infoSymbol``, ``InfoConstraint/key``, and
 ``InfoConstraint/match``. The `infoSymbol` is the symbol which marks the constraint as being an info expression; in
 most cases this symbol or its equivalent for other `Constraint`s is unlikely to be of much use. The latter two
 properties are respectively of types ``KeyExpression`` and ``MatchExpression``. In total there are five such types like
@@ -160,8 +159,12 @@ The common requirements you'll see with OIDs are likely:
 The first requirement is typically `and`ed together with `anchor apple generic`. The net effect of this requirement is
 to evaluate whether the certificate chain was signed by Apple and is for a Mac App Store app.
 
-The latter two requirements are typically `and`ed together along with `anchor apple generic`. Collectively these three
-requirements evaluate whether the certificate chain was signed by Apple and is for a Developer ID app.
+The two and third requirements are commonly `and`ed together along with `anchor apple generic`. Collectively these
+three requirements evaluate whether the certificate chain was signed by Apple and is for a Developer ID app.
+
+The last requirement is normally `and`ed together to a `certificate leaf[subject.CN]` constraint as well as
+`anchor apple generic`. Together these three constraints are regularly used for code that's signed for development, not
+release.
 
 ## Implementation Notes
 Here's how the source code for this project is structured:
@@ -189,8 +192,15 @@ Here's how the source code for this project is structured:
       `RequirementSet` with [`SecRequirement`](https://developer.apple.com/documentation/security/secrequirement) and 
       [`SecRequirementType`](https://developer.apple.com/documentation/security/secrequirementtype)
 
-## Topics
+## Apple Resources
+Apple has published several documents that discuss to varying degrees their requirements language:
+- [Code Signing Requirement Language](https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/RequirementLang/RequirementLang.html#//apple_ref/doc/uid/TP40005929-CH5-SW1)
+- [TN2206: macOS Code Signing In Depth](https://developer.apple.com/library/archive/technotes/tn2206/_index.html)
+- [TN3125: Inside Code Signing: Provisioning Profiles](https://developer.apple.com/documentation/technotes/tn3125-inside-code-signing-provisioning-profiles)
+- [TN3126: Inside Code Signing: Hashes](https://developer.apple.com/documentation/technotes/tn3126-inside-code-signing-hashes)
+- [TN3127: Inside Code Signing: Requirements](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements)
 
+## Topics
 ### Evaluation
 - ``Evaluation``
 
