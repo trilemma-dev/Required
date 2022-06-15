@@ -17,7 +17,7 @@ public extension Requirement {
     // not change anything about the above except if an API user explicitly cast a requirement to one of its concrete
     // implementations.
     
-    /// Evaluates this requirement relative to this provided static code.
+    /// Evaluates this requirement relative to the provided static code.
     ///
     /// This evaluation is recursive for all child requirements of this requirement.
     func evaluateForStaticCode(_ staticCode: SecStaticCode) throws -> Evaluation {
@@ -43,6 +43,13 @@ public extension Requirement {
             default:
                 fatalError("Unknown type: \(self.self)")
         }
+    }
+    
+    /// Evaluates this requirement relative to the static representation of the provided code.
+    ///
+    /// This evaluation is recursive for all child requirements of this requirement.
+    func evaluateForCode(_ code: SecCode) throws -> Evaluation {
+        try evaluateForStaticCode(try code.asStaticCode())
     }
     
     /// Evaluates this requirement relative to this current process.
