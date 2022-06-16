@@ -20,6 +20,11 @@ extension MatchExpression {
                                       "comparison for a string. Expected: \(expected.value) Actual: \(actualValue)"
                     return .constraintNotSatisfied(constraint, explanation: explanation)
                 }
+                
+                if operation is EqualsSymbol, actualValue != expected.value {
+                    let explanation = "\(actualValue) is not equal to expected value \(expected.value)"
+                    return .constraintNotSatisfied(constraint, explanation: explanation)
+                }
 
                 let result = CFStringCompare(actualValue as CFString, expected.value as CFString, .compareNumerically)
                 switch result {
